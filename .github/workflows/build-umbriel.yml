@@ -26,9 +26,10 @@ jobs:
     container:
       image: cachyos/cachyos-v3
     steps:
-      - name: Install dependencies
+      - name: Configure pacman sandbox and install dependencies
         run: |
           set -euo pipefail
+          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
           pacman -Syu --noconfirm --needed git sudo github-cli fakeroot binutils pacman-contrib paru curl jq
           id builder >/dev/null 2>&1 || useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
@@ -38,8 +39,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p /build output
-          chown -R builder:builder /build output
+          mkdir -p /build/output /github/workspace/artifacts
+          chown -R builder:builder /build /github/workspace/artifacts
           cd /build
 
           sudo -u builder git clone --depth=1 https://aur.archlinux.org/xdg-desktop-portal-umbriel-git.git pkg
@@ -54,7 +55,7 @@ jobs:
           ALREADY_EXISTS=false
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$EXPECTED_PKG"; then
             echo "Package $EXPECTED_PKG is already built on Release. Downloading cached artifact."
-            if gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir output --pattern "$EXPECTED_PKG"; then
+            if gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir /build/output --pattern "$EXPECTED_PKG"; then
               ALREADY_EXISTS=true
             fi
           fi
@@ -62,16 +63,16 @@ jobs:
           if [[ "$ALREADY_EXISTS" == "false" ]]; then
             echo "Building $EXPECTED_PKG..."
             sudo -u builder paru -B --noconfirm --skipreview --nocheck -i .
-            mv *.pkg.tar.zst output/
+            mv *.pkg.tar.zst /build/output/
           fi
 
-          cp output/*.pkg.tar.zst /github/workspace/ || true
+          cp /build/output/*.pkg.tar.zst /github/workspace/artifacts/
 
       - name: Upload Portal Artifact
         uses: actions/upload-artifact@v4
         with:
           name: portal-pkg
-          path: /github/workspace/*.pkg.tar.zst
+          path: /github/workspace/artifacts/*.pkg.tar.zst
           retention-days: 1
 
   build-umbriel:
@@ -81,9 +82,10 @@ jobs:
     container:
       image: cachyos/cachyos-v3
     steps:
-      - name: Install dependencies
+      - name: Configure pacman sandbox and install dependencies
         run: |
           set -euo pipefail
+          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
           pacman -Syu --noconfirm --needed git sudo github-cli fakeroot binutils pacman-contrib paru curl jq
           id builder >/dev/null 2>&1 || useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
@@ -104,8 +106,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p /build output
-          chown -R builder:builder /build output
+          mkdir -p /build/output /github/workspace/artifacts
+          chown -R builder:builder /build /github/workspace/artifacts
           cd /build
 
           sudo -u builder git clone --depth=1 https://aur.archlinux.org/umbriel-git.git pkg
@@ -120,7 +122,7 @@ jobs:
           ALREADY_EXISTS=false
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$EXPECTED_PKG"; then
             echo "Package $EXPECTED_PKG is already built on Release. Downloading cached artifact."
-            if gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir output --pattern "$EXPECTED_PKG"; then
+            if gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir /build/output --pattern "$EXPECTED_PKG"; then
               ALREADY_EXISTS=true
             fi
           fi
@@ -128,16 +130,16 @@ jobs:
           if [[ "$ALREADY_EXISTS" == "false" ]]; then
             echo "Building $EXPECTED_PKG..."
             sudo -u builder paru -B --noconfirm --skipreview --nocheck .
-            mv *.pkg.tar.zst output/
+            mv *.pkg.tar.zst /build/output/
           fi
 
-          cp output/*.pkg.tar.zst /github/workspace/ || true
+          cp /build/output/*.pkg.tar.zst /github/workspace/artifacts/
 
       - name: Upload Umbriel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: umbriel-pkg
-          path: /github/workspace/*.pkg.tar.zst
+          path: /github/workspace/artifacts/*.pkg.tar.zst
           retention-days: 1
 
   publish:
@@ -148,12 +150,14 @@ jobs:
       image: ghcr.io/archlinux/archlinux:latest
     steps:
       - name: Install pacman tools
-        run: pacman -Syu --noconfirm --needed github-cli pacman-contrib
+        run: |
+          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
+          pacman -Syu --noconfirm --needed github-cli pacman-contrib
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: output
+          path: /tmp/output
           merge-multiple: true
 
       - name: Create Repo DB and Publish
@@ -161,7 +165,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cd output
+          cd /tmp/output
           shopt -s nullglob
           pkgs=( *.pkg.tar.zst )
 
