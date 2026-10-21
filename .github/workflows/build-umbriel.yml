@@ -49,6 +49,7 @@ jobs:
           # Tính toán phiên bản pkgver thực tế từ git upstream
           sudo -u builder makepkg -od --noprepare --skipinteg
           EXPECTED_PKG=$(sudo -u builder makepkg --packagelist | head -n 1 | xargs -n 1 basename)
+          EXPECTED_PKG="${EXPECTED_PKG//:/.}"
           echo "Expected package: $EXPECTED_PKG"
 
           # Kiểm tra nếu phiên bản này đã tồn tại trên Release thì tải về, không cần build lại
@@ -65,6 +66,13 @@ jobs:
             sudo -u builder paru -B --noconfirm --skipreview --nocheck -i .
             mv *.pkg.tar.zst /build/output/
           fi
+
+          # Đổi dấu hai chấm thành chấm để tránh lỗi artifact upload
+          for f in /build/output/*:* ; do
+            if [[ -f "$f" ]]; then
+              mv "$f" "${f//:/.}"
+            fi
+          done
 
           cp /build/output/*.pkg.tar.zst /github/workspace/artifacts/
 
@@ -116,6 +124,7 @@ jobs:
           # Tính toán phiên bản thực tế từ git upstream
           sudo -u builder makepkg -od --noprepare --skipinteg
           EXPECTED_PKG=$(sudo -u builder makepkg --packagelist | head -n 1 | xargs -n 1 basename)
+          EXPECTED_PKG="${EXPECTED_PKG//:/.}"
           echo "Expected package: $EXPECTED_PKG"
 
           # Kiểm tra nếu phiên bản này đã tồn tại trên Release thì tải về
@@ -132,6 +141,13 @@ jobs:
             sudo -u builder paru -B --noconfirm --skipreview --nocheck .
             mv *.pkg.tar.zst /build/output/
           fi
+
+          # Đổi dấu hai chấm thành chấm để tránh lỗi artifact upload
+          for f in /build/output/*:* ; do
+            if [[ -f "$f" ]]; then
+              mv "$f" "${f//:/.}"
+            fi
+          done
 
           cp /build/output/*.pkg.tar.zst /github/workspace/artifacts/
 
@@ -196,7 +212,7 @@ jobs:
           RELEASE_NOTES=$(cat <<EOF
           ### 📦 Umbriel Auto-Build Status
           **Last Updated:** $(date -u '+%Y-%m-%d %H:%M UTC')
-          - $(printf '%s\n' "${pkgs_all[@]}")
+          $(printf -- '- %s\n' "${pkgs_all[@]}")
           EOF
           )
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes "$RELEASE_NOTES"
