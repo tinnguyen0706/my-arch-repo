@@ -16,12 +16,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REPO_DB_NAME: myrepo
+  REPO_DB_NAME: tinhiem
   RELEASE_TAG: repository
 
 jobs:
   build-portal:
-    name: Build xdg-desktop-portal-umbriel-git
+    name: Build xdg-desktop-portal-umbriel-git (v3)
     runs-on: ubuntu-latest
     container:
       image: cachyos/cachyos-v3
@@ -33,6 +33,16 @@ jobs:
           pacman -Syu --noconfirm --needed git sudo github-cli fakeroot binutils pacman-contrib paru curl jq
           id builder >/dev/null 2>&1 || useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Configure CachyOS x86-64-v3 makepkg profile
+        run: |
+          set -euo pipefail
+          curl -sLo /etc/makepkg.conf https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/docker-makepkg-v3/makepkg.conf
+          mkdir -p /etc/makepkg.conf.d
+          curl -sLo /etc/makepkg.conf.d/rust.conf https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/docker-makepkg-v3/rust.conf
+          sed -i 's/^PKGDEST=/#PKGDEST=/g' /etc/makepkg.conf
+          sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
+          sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
 
       - name: Fetch and Build Portal
         env:
@@ -62,7 +72,7 @@ jobs:
           fi
 
           if [[ "$ALREADY_EXISTS" == "false" ]]; then
-            echo "Building $EXPECTED_PKG..."
+            echo "Building $EXPECTED_PKG with x86-64-v3 optimization..."
             sudo -u builder paru -B --noconfirm --skipreview --nocheck -i .
             mv *.pkg.tar.zst /build/output/
           fi
@@ -84,7 +94,7 @@ jobs:
           retention-days: 1
 
   build-umbriel:
-    name: Build umbriel-git
+    name: Build umbriel-git (v3)
     needs: build-portal
     runs-on: ubuntu-latest
     container:
@@ -97,6 +107,16 @@ jobs:
           pacman -Syu --noconfirm --needed git sudo github-cli fakeroot binutils pacman-contrib paru curl jq
           id builder >/dev/null 2>&1 || useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Configure CachyOS x86-64-v3 makepkg profile
+        run: |
+          set -euo pipefail
+          curl -sLo /etc/makepkg.conf https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/docker-makepkg-v3/makepkg.conf
+          mkdir -p /etc/makepkg.conf.d
+          curl -sLo /etc/makepkg.conf.d/rust.conf https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/docker-makepkg-v3/rust.conf
+          sed -i 's/^PKGDEST=/#PKGDEST=/g' /etc/makepkg.conf
+          sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
+          sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
 
       - name: Download Portal Artifact and Install
         uses: actions/download-artifact@v4
@@ -137,7 +157,7 @@ jobs:
           fi
 
           if [[ "$ALREADY_EXISTS" == "false" ]]; then
-            echo "Building $EXPECTED_PKG..."
+            echo "Building $EXPECTED_PKG with x86-64-v3 optimization..."
             sudo -u builder paru -B --noconfirm --skipreview --nocheck .
             mv *.pkg.tar.zst /build/output/
           fi
@@ -195,8 +215,8 @@ jobs:
           # Kiểm tra hoặc tạo release nếu chưa có
           if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --title "Arch Package Repository" \
-              --notes "Automated build for umbriel-git and dependencies."
+              --title "Arch Package Repository (x86-64-v3)" \
+              --notes "Automated x86-64-v3 build for umbriel-git and dependencies."
           fi
 
           # Tải các gói cũ đang có trên release (nếu có) để tạo database trọn vẹn
@@ -210,7 +230,7 @@ jobs:
           gh release upload "$RELEASE_TAG" "${pkgs_all[@]}" "${REPO_DB_NAME}".db* "${REPO_DB_NAME}".files* --repo "$GITHUB_REPOSITORY" --clobber
 
           RELEASE_NOTES=$(cat <<EOF
-          ### 📦 Umbriel Auto-Build Status
+          ### 📦 Umbriel Auto-Build Status (x86-64-v3)
           **Last Updated:** $(date -u '+%Y-%m-%d %H:%M UTC')
           $(printf -- '- %s\n' "${pkgs_all[@]}")
           EOF
