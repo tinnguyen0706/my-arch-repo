@@ -2,8 +2,8 @@ name: Sync Packages (AUR & GitHub Releases)
 
 on:
   schedule:
-    # 02:00 sáng mỗi ngày giờ VN (UTC+7) = 19:00 UTC hôm trước
-    - cron: '0 19 * * *'
+    # Chạy mỗi giờ (vào phút thứ 7)
+    - cron: '7 * * * *'
   workflow_dispatch: {}
   push:
     branches: [main]

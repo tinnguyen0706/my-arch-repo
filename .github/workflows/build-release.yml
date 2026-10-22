@@ -2,8 +2,8 @@ name: Build and Publish Arch Repository (v3 & v4)
 
 on:
   schedule:
-    # 02:15 sáng mỗi ngày giờ VN (UTC+7) = 19:15 UTC hôm trước
-    - cron: '15 19 * * *'
+    # Chạy mỗi giờ (vào phút thứ 15)
+    - cron: '15 * * * *'
   push:
     branches: [main]
     paths-ignore:
