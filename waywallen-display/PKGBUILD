@@ -41,7 +41,7 @@ build() {
 }
 
 package_waywallen-display() {
-    pkgdesc="Desktop integration for waywallen"
+    pkgdesc="Desktop integration for the waywallen wallpaper daemon."
     optdepends=('libglvnd: EGL backend'
                 'vulkan-icd-loader: Vulkan backend'
                 'qt6-base: The qml plugin'
