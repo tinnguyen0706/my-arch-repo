@@ -2,7 +2,6 @@
 # AUR packages (Auto-synced from AUR, compiled for x86-64-v3 & v4)
 xdg-desktop-portal-umbriel-git
 umbriel-git
-fcitx5-lotus
 tex-fmt
 
 #####
@@ -17,3 +16,4 @@ local:office-craft
 # Local packages (Auto-checked from GitHub Releases)
 local:auto-cpufreq
 local:zalo
+local:fcitx5-lotus
