@@ -20,18 +20,34 @@ SigLevel = Optional TrustAll
 Server = https://github.com/tinnguyen0706/my-arch-repo/releases/download/repository
 ```
 
-Cập nhật và cài đặt:
+Cập nhật database và cài đặt:
 
 ```bash
 sudo pacman -Sy
+
+# Cài đặt trọn bộ văn phòng Storytold Craft (Word, Grid, Deck, PDF):
+sudo pacman -S story-office
+
+# Hoặc cài đặt lẻ từng ứng dụng:
+sudo pacman -S wordcraft
+sudo pacman -S gridcraft
+sudo pacman -S deckcraft
+sudo pacman -S pdfcraft
+
+# Cài đặt Wayland compositor Umbriel:
 sudo pacman -S umbriel-git
 ```
 
 ---
 
-## 🛠️ Quản lý các gói
+## 🛠️ Danh sách các gói được duy trì
 
-Tất cả các gói được quản lý tập trung thông qua file `packages.txt`:
-
-1. **Gói AUR**: Điền tên package AUR vào file `packages.txt`. Workflow `sync-aur.yml` sẽ định kỳ kiểm tra và kéo PKGBUILD mới nhất về thông qua Pull Request.
-2. **Gói tự maintain (Local)**: Thêm tiền tố `local:<tên-gói>` vào `packages.txt` và tự quản lý thư mục cùng tên trong repository.
+| Gói | Nguồn | Mô tả |
+| :--- | :--- | :--- |
+| `umbriel-git` | AUR / GitHub | Wayland compositor hiện đại đa layout (dwindle, master, scrolling) |
+| `xdg-desktop-portal-umbriel-git` | AUR / GitHub | XDG Desktop Portal backend cho Umbriel |
+| `wordcraft` | GitHub `storytold/wordcraft` | Ứng dụng soạn thảo văn bản thuần Rust (Word-style) |
+| `gridcraft` | GitHub `storytold/gridcraft` | Ứng dụng bảng tính thuần Rust (Excel-style) |
+| `deckcraft` | GitHub `storytold/deckcraft` | Ứng dụng trình chiếu slide thuần Rust (PowerPoint-style) |
+| `pdfcraft` | GitHub `storytold/pdfcraft` | Ứng dụng đọc và chỉnh sửa PDF thuần Rust (Acrobat-style) |
+| `story-office` | Local Meta-package | Gói liên kết gom trọn bộ 4 ứng dụng văn phòng của Storytold |

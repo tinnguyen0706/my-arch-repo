@@ -1,0 +1,36 @@
+pkgname=deckcraft
+pkgver=0.9.0
+pkgrel=1
+pkgdesc="Presentations and slide shows in pure Rust (PowerPoint-style)"
+arch=('x86_64')
+url="https://github.com/storytold/deckcraft"
+license=('MIT' 'Apache-2.0')
+depends=('glibc' 'libgcc' 'hicolor-icon-theme' 'alsa-lib')
+makedepends=('cargo' 'git')
+source=("git+https://github.com/storytold/deckcraft.git#tag=v$pkgver")
+b2sums=('SKIP')
+
+build() {
+  cd "$pkgname"
+  cargo build --release --locked -p "$pkgname"
+}
+
+package() {
+  cd "$pkgname"
+  install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+
+  install -Dm644 "packaging/linux/ai.storyteller.$pkgname.desktop" \
+    "$pkgdir/usr/share/applications/ai.storyteller.$pkgname.desktop"
+
+  for s in 16 24 32 48 64 128 256 512; do
+    local icon="assets/app-icon/hicolor/${s}x${s}/apps/ai.storyteller.$pkgname.png"
+    if [[ -f "$icon" ]]; then
+      install -Dm644 "$icon" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/ai.storyteller.$pkgname.png"
+    fi
+  done
+
+  local svg="assets/app-icon/hicolor/scalable/apps/ai.storyteller.$pkgname.svg"
+  if [[ -f "$svg" ]]; then
+    install -Dm644 "$svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/ai.storyteller.$pkgname.svg"
+  fi
+}

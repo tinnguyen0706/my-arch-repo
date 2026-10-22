@@ -1,4 +1,15 @@
 #####
-# Packages maintained
+# AUR packages
 xdg-desktop-portal-umbriel-git
 umbriel-git
+
+#####
+# Storytold Craft Apps (Official GitHub tags, compiled for x86-64-v3 & v4)
+local:wordcraft
+local:gridcraft
+local:deckcraft
+local:pdfcraft
+
+#####
+# Storytold Office Meta-package
+local:story-office
