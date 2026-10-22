@@ -184,7 +184,7 @@ jobs:
             echo "$PKG ($TARGET_ARCH)" > "output/status-skipped-${PKG}-${TARGET_ARCH}.txt"
           else
             echo "Updating checksums for $PKG..."
-            if [[ "$PKG" == "story-office" ]] || grep -q "arch=('any')" "$PKG/PKGBUILD"; then
+            if [[ "$PKG" == "office-craft" || "$PKG" == "story-office" ]] || grep -q "arch=('any')" "$PKG/PKGBUILD"; then
               echo "Building meta-package $PKG with makepkg -d..."
               sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -d --noconfirm"
             else

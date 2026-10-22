@@ -25,8 +25,8 @@ Cập nhật database và cài đặt:
 ```bash
 sudo pacman -Sy
 
-# Cài đặt trọn bộ văn phòng Storytold Craft (Word, Grid, Deck, PDF):
-sudo pacman -S story-office
+# Cài đặt trọn bộ văn phòng Office Craft (Word, Grid, Deck, PDF):
+sudo pacman -S office-craft
 
 # Hoặc cài đặt lẻ từng ứng dụng:
 sudo pacman -S wordcraft
@@ -50,4 +50,4 @@ sudo pacman -S umbriel-git
 | `gridcraft` | GitHub `storytold/gridcraft` | Ứng dụng bảng tính thuần Rust (Excel-style) |
 | `deckcraft` | GitHub `storytold/deckcraft` | Ứng dụng trình chiếu slide thuần Rust (PowerPoint-style) |
 | `pdfcraft` | GitHub `storytold/pdfcraft` | Ứng dụng đọc và chỉnh sửa PDF thuần Rust (Acrobat-style) |
-| `story-office` | Local Meta-package | Gói liên kết gom trọn bộ 4 ứng dụng văn phòng của Storytold |
+| `office-craft` | Local Meta-package | Gói liên kết gom trọn bộ 4 ứng dụng văn phòng của Storytold |

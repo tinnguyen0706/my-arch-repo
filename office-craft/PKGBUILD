@@ -1,10 +1,13 @@
-pkgname=story-office
+pkgname=office-craft
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="Complete office suite from storytold (wordcraft, gridcraft, deckcraft, pdfcraft)"
 arch=('any')
 url="https://github.com/storytold"
 license=('MIT' 'Apache-2.0')
+provides=('story-office')
+conflicts=('story-office')
+replaces=('story-office')
 depends=(
   'wordcraft'
   'gridcraft'
@@ -15,7 +18,7 @@ depends=(
 package() {
   install -d "$pkgdir/usr/share/doc/$pkgname"
   cat << 'EOF' > "$pkgdir/usr/share/doc/$pkgname/README"
-Storytold Office Suite:
+Office Craft Suite (Storytold):
 - wordcraft: Word processor
 - gridcraft: Spreadsheet
 - deckcraft: Presentation & Slides

@@ -12,4 +12,4 @@ local:pdfcraft
 
 #####
 # Storytold Office Meta-package
-local:story-office
+local:office-craft
