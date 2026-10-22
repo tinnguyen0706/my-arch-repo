@@ -28,35 +28,61 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_packages: ${{ steps.set-matrix.outputs.has_packages }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Scan directories and generate matrix
         id: set-matrix
         run: |
           set -euo pipefail
-          pkgs=()
-          for dir in */ ; do
-            dir="${dir%/}"
-            case "$dir" in
-              .github|cache|output) continue ;;
-            esac
-            if [[ -f "$dir/PKGBUILD" ]]; then
-              pkgs+=("$dir")
-            fi
-          done
+
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Scheduled or manual run: scanning all packages."
+            pkgs=()
+            for dir in */ ; do
+              dir="${dir%/}"
+              case "$dir" in
+                .github|cache|output) continue ;;
+              esac
+              if [[ -f "$dir/PKGBUILD" ]]; then
+                pkgs+=("$dir")
+              fi
+            done
+          else
+            echo "Push or merged PR event: detecting changed packages."
+            mapfile -t CHANGED < <(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $1}' | sort -u)
+            pkgs=()
+            for dir in "${CHANGED[@]}"; do
+              case "$dir" in
+                .github|cache|output|"") continue ;;
+              esac
+              if [[ -f "$dir/PKGBUILD" ]]; then
+                pkgs+=("$dir")
+              fi
+            done
+          fi
+
+          if (( ${#pkgs[@]} == 0 )); then
+            echo "No packages changed in this merge/push."
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            echo "has_packages=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           MATRIX_JSON=$(printf '%s\n' "${pkgs[@]}" | jq -R . | jq -s -c .)
-          echo "Found packages: $MATRIX_JSON"
+          echo "Found packages to build: $MATRIX_JSON"
           echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
+          echo "has_packages=true" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.package }} (${{ matrix.target.arch }})
     needs: prepare
     runs-on: ubuntu-latest
+    if: ${{ needs.prepare.outputs.has_packages == 'true' }}
     container:
       image: cachyos/cachyos-v3
     strategy:
@@ -261,6 +287,7 @@ jobs:
     name: Generate Pacman DB & Publish Release
     needs: [prepare, build]
     runs-on: ubuntu-latest
+    if: ${{ always() && needs.prepare.outputs.has_packages == 'true' }}
     permissions:
       contents: write
     container:
