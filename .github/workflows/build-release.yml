@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
-          pacman -Syu --noconfirm --needed git subversion mercurial sudo rsync github-cli fakeroot binutils pacman-contrib paru curl awk tar jq rustup cmake clang perl
+          pacman -Syu --noconfirm --needed git subversion mercurial sudo rsync github-cli fakeroot binutils pacman-contrib paru curl awk tar jq rustup cmake clang perl python-build python-installer python-wheel python-setuptools
           id builder >/dev/null 2>&1 || useradd -m builder
           grep -q '^builder ALL=(ALL) NOPASSWD: ALL$' /etc/sudoers || echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
           rustup default stable
@@ -316,6 +316,7 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          mkdir -p output
           cd output
           shopt -s nullglob
 
