@@ -1,8 +1,9 @@
-name: Sync AUR Packages
+name: Sync Packages (AUR & GitHub Releases)
 
 on:
   schedule:
-    - cron: '7 * * * *'
+    # 02:00 sáng mỗi ngày giờ VN (UTC+7) = 19:00 UTC hôm trước
+    - cron: '0 19 * * *'
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -35,6 +36,8 @@ jobs:
 
       - name: Sync packages and prune removed
         id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
 
@@ -122,7 +125,35 @@ jobs:
 
               if [[ "$pkg_entry" == local:* ]]; then
                 pkg="${pkg_entry#local:}"
-                echo "Skipping sync for local package: $pkg"
+                echo "Checking local package: $pkg"
+
+                if [[ ! -f "$pkg/PKGBUILD" ]]; then
+                  touch "$STATUS_DIR/skipped/$pkg"
+                  exit 0
+                fi
+
+                # Tìm địa chỉ GitHub repo từ url hoặc source trong PKGBUILD
+                gh_repo=$(grep -E 'url="https://github.com/[^"]+"' "$pkg/PKGBUILD" | head -n 1 | sed -E 's/.*url="https:\/\/github\.com\/([^"]+)".*/\1/' || true)
+                if [[ -z "$gh_repo" ]]; then
+                  gh_repo=$(grep -E 'github\.com/[^/]+/[^/\.\"]+' "$pkg/PKGBUILD" | head -n 1 | sed -E 's/.*github\.com\/([^\/]+\/[^\/\.\"]+).*/\1/' || true)
+                fi
+
+                if [[ -n "$gh_repo" && "$gh_repo" =~ ^[^/]+/[^/]+$ ]]; then
+                  echo "Found GitHub upstream for $pkg: $gh_repo"
+                  latest_tag=$(gh api "repos/$gh_repo/releases/latest" --jq '.tag_name' 2>/dev/null || gh api "repos/$gh_repo/tags" --jq '.[0].name' 2>/dev/null || true)
+                  latest_ver="${latest_tag#v}"
+                  current_ver=$(grep -E '^pkgver=' "$pkg/PKGBUILD" | head -n 1 | cut -d= -f2 | tr -d '"'\'' ')
+
+                  if [[ -n "$latest_ver" && "$latest_ver" != "$current_ver" ]]; then
+                    echo "New upstream release detected for $pkg ($gh_repo): $current_ver -> $latest_ver"
+                    sed -i "s/^pkgver=.*/pkgver=$latest_ver/" "$pkg/PKGBUILD"
+                    sed -i "s/^pkgrel=.*/pkgrel=1/" "$pkg/PKGBUILD"
+                    touch "$STATUS_DIR/synced/$pkg"
+                    exit 0
+                  fi
+                fi
+
+                echo "Local package $pkg is up to date."
                 touch "$STATUS_DIR/skipped/$pkg"
                 exit 0
               fi
@@ -208,18 +239,18 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore(aur-sync): sync package sources and prune deletions'
+          commit-message: 'chore(sync): update package sources (AUR & GitHub Releases)'
           branch: aur-sync
           delete-branch: true
-          title: 'AUR sync: cập nhật và dọn dẹp source packages'
+          title: 'Package Sync: Cập nhật source packages (AUR & GitHub Releases)'
           labels: aur-sync
           body: |
-            ### 🔄 AUR / CachyOS Synchronization Report
+            ### 🔄 Package Synchronization Report
 
-            Hệ thống tự động đã thực hiện kiểm tra và đồng bộ hóa các gói từ CachyOS và AUR.
+            Hệ thống tự động đã kiểm tra và đồng bộ hóa các gói từ AUR và các bản Release mới trên GitHub.
 
             | Trạng thái | Gói phần mềm |
             | :--- | :--- |
-            | 🟢 **Synced Successfully** | `${{ steps.sync.outputs.synced || 'none' }}` |
+            | 🟢 **Synced / Updated** | `${{ steps.sync.outputs.synced || 'none' }}` |
             | 🔴 **Failed to Sync** | `${{ steps.sync.outputs.failed || 'none' }}` |
             | 🧹 **Pruned / Removed** | `${{ steps.sync.outputs.removed || 'none' }}` |
