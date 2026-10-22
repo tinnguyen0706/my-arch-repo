@@ -650,6 +650,23 @@ jobs:
               --notes "Automated release tag."
           fi
 
+          status_built=( status-built-*.txt )
+          status_skipped=( status-skipped-*.txt )
+          status_restored=( status-restored-*.txt )
+          status_failed=( status-failed-*.txt )
+
+          BUILT_LOG=""
+          for f in "${status_built[@]}"; do [[ -f "$f" ]] && BUILT_LOG+="- $(cat "$f")"$'\n'; done
+
+          SKIPPED_LOG=""
+          for f in "${status_skipped[@]}"; do [[ -f "$f" ]] && SKIPPED_LOG+="- $(cat "$f")"$'\n'; done
+
+          RESTORED_LOG=""
+          for f in "${status_restored[@]}"; do [[ -f "$f" ]] && RESTORED_LOG+="- $(cat "$f")"$'\n'; done
+
+          FAILED_LOG=""
+          for f in "${status_failed[@]}"; do [[ -f "$f" ]] && FAILED_LOG+="- $(cat "$f")"$'\n'; done
+
           RELEASE_NOTES=$(cat <<EOF
           ### 📦 Repository Update Summary
           **Cập nhật lúc:** $(TZ='Asia/Ho_Chi_Minh' date '+%Y-%m-%d %H:%M (UTC+7)')
@@ -657,8 +674,17 @@ jobs:
           - 🔗 **Changelog / Commit Diff:** https://github.com/${REPO}/commit/${SHA}
           - 🌐 **Máy chủ tải gói (VPS):** https://tinhiem.duckdns.org/
 
-          #### Danh sách các gói cập nhật trong đợt này:
-          $(printf -- '- %s\n' "${pkgs_all[@]}")
+          #### ✅ Gói mới biên dịch thành công:
+          ${BUILT_LOG:-None}
+
+          #### ⚡ Gói tận dụng cache (bỏ qua compile):
+          ${SKIPPED_LOG:-None}
+
+          #### 🔄 Gói dùng lại bản cũ từ VPS (do build lỗi):
+          ${RESTORED_LOG:-None}
+
+          #### ❌ Gói build thất bại:
+          ${FAILED_LOG:-None}
           EOF
           )
           gh release edit "$TAG" --repo "$REPO" --title "Arch Repository Release" --notes "$RELEASE_NOTES"
