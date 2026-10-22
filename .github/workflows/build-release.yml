@@ -347,15 +347,18 @@ jobs:
 
           # 1. Cấu hình SSH và Deploy trực tiếp sang VPS
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
+          SSH_CMD="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
+
           echo "Deploying packages and databases to VPS /var/www/repo..."
-          rsync -avz -e "ssh -o StrictHostKeyChecking=accept-new" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
+          rsync -avz -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
 
           # 2. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
-          ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
+          $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
           from pathlib import Path
           from collections import defaultdict
           repo_dir = Path("/var/www/repo")
