@@ -1,7 +1,0 @@
-*
-!0001-cmake-Install-kde-wallpaper-to-correct-path.patch
-!0002-cmake-Install-gnome-extensions-separately.patch
-!PKGBUILD
-!.SRCINFO
-!.gitignore
-!.nvchecker.toml
