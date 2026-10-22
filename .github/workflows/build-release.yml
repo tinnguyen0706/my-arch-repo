@@ -108,6 +108,9 @@ jobs:
           grep -q '^builder ALL=(ALL) NOPASSWD: ALL$' /etc/sudoers || echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
           rustup default stable
           sudo -u builder rustup default stable
+          if [[ "${{ matrix.package }}" == "waywallen" || "${{ matrix.package }}" == "open-wallpaper-engine" ]]; then
+            sudo -u builder paru -S --noconfirm --removemake lito
+          fi
 
       - name: Configure makepkg for ${{ matrix.target.arch }}
         run: |
