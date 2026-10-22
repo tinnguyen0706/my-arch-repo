@@ -6,11 +6,12 @@ green='\e[1;32m'
 _get_target_users() {
     local target_users=()
 
+    # 1. User gọi sudo (hoạt động hoàn hảo trong cả TTY, SSH và Terminal đồ họa)
     if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
         target_users+=("$SUDO_USER")
     fi
 
-    # Lấy thêm user đang đăng nhập phiên đồ họa có UID >= 1000
+    # 2. Quét tất cả user đang đăng nhập hệ thống (logind ghi nhận cả TTY lẫn Desktop)
     while read -r uid user; do
         if [ -n "$user" ] && [ "$user" != "root" ]; then
             case " ${target_users[*]:-} " in
@@ -19,6 +20,16 @@ _get_target_users() {
             esac
         fi
     done < <(loginctl list-users --no-legend 2>/dev/null | awk '$1 >= 1000 {print $1, $2}')
+
+    # 3. Dự phòng: nếu đang ở TTY đăng nhập thẳng bằng root (không qua sudo),
+    # tự động quét các user thực tế có trong hệ thống (UID từ 1000 đến 60000)
+    if [ ${#target_users[@]} -eq 0 ]; then
+        while IFS=: read -r username _ uid _ _ _ shell; do
+            if [ "$uid" -ge 1000 ] && [ "$uid" -le 60000 ] && [ "$shell" != "/sbin/nologin" ] && [ "$shell" != "/bin/false" ]; then
+                target_users+=("$username")
+            fi
+        done < /etc/passwd
+    fi
 
     echo "${target_users[@]}"
 }
@@ -37,9 +48,11 @@ post_install() {
             echo -e ":: ${green}Tự động kích hoạt fcitx5-lotus-server cho user ${u}...${all_off}"
             systemctl enable --now "fcitx5-lotus-server@${u}.service" 2>/dev/null || true
 
+            # Nếu user đang chạy fcitx5 (ví dụ đang ở TTY nhưng desktop nền vẫn chạy, hoặc đang trong terminal GUI)
             if pgrep -u "$u" -x fcitx5 >/dev/null 2>&1; then
                 echo -e ":: ${green}Khởi động lại fcitx5 cho user ${u}...${all_off}"
                 systemctl --user -M "${u}@" restart fcitx5.service 2>/dev/null || \
+                pkill -u "$u" -USR1 fcitx5 2>/dev/null || \
                 sudo -u "$u" fcitx5 -r -d 2>/dev/null || \
                 pkill -u "$u" -x fcitx5 2>/dev/null || true
             fi
@@ -69,6 +82,7 @@ post_upgrade() {
             if pgrep -u "$u" -x fcitx5 >/dev/null 2>&1; then
                 echo -e ":: ${green}Khởi động lại fcitx5 cho user ${u}...${all_off}"
                 systemctl --user -M "${u}@" restart fcitx5.service 2>/dev/null || \
+                pkill -u "$u" -USR1 fcitx5 2>/dev/null || \
                 sudo -u "$u" fcitx5 -r -d 2>/dev/null || \
                 pkill -u "$u" -x fcitx5 2>/dev/null || true
             fi
