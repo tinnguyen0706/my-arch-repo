@@ -2,7 +2,6 @@
 # AUR packages (Auto-synced from AUR, compiled for x86-64-v3 & v4)
 xdg-desktop-portal-umbriel-git
 umbriel-git
-tex-fmt
 
 #####
 # Storytold Craft Apps (Official GitHub tags, compiled for x86-64-v3 & v4)
@@ -17,3 +16,4 @@ local:office-craft
 local:auto-cpufreq
 local:zalo
 local:fcitx5-lotus
+local:tex-fmt
