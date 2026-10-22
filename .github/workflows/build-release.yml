@@ -1,0 +1,336 @@
+name: Build and Publish Arch Repository (v3 & v4)
+
+on:
+  schedule:
+    - cron: '15 * * * *'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+      - 'README.md'
+      - 'packages.txt'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-repo
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+env:
+  RELEASE_TAG: repository
+
+jobs:
+  prepare:
+    name: Scan packages
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Scan directories and generate matrix
+        id: set-matrix
+        run: |
+          set -euo pipefail
+          pkgs=()
+          for dir in */ ; do
+            dir="${dir%/}"
+            case "$dir" in
+              .github|cache|output) continue ;;
+            esac
+            if [[ -f "$dir/PKGBUILD" ]]; then
+              pkgs+=("$dir")
+            fi
+          done
+
+          MATRIX_JSON=$(printf '%s\n' "${pkgs[@]}" | jq -R . | jq -s -c .)
+          echo "Found packages: $MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.package }} (${{ matrix.target.arch }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    container:
+      image: cachyos/cachyos-v3
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.prepare.outputs.matrix) }}
+        target:
+          - arch: v3
+            profile: docker-makepkg-v3
+            pkgcarch: x86_64_v3
+            db: tinhiem
+          - arch: v4
+            profile: docker-makepkg-v4
+            pkgcarch: x86_64_v4
+            db: tinhiem-v4
+    steps:
+      - name: Install base dependencies
+        run: |
+          set -euo pipefail
+          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
+          pacman -Syu --noconfirm --needed git subversion mercurial sudo rsync github-cli fakeroot binutils pacman-contrib paru curl awk tar jq rustup
+          id builder >/dev/null 2>&1 || useradd -m builder
+          grep -q '^builder ALL=(ALL) NOPASSWD: ALL$' /etc/sudoers || echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          rustup default stable
+          sudo -u builder rustup default stable
+
+      - name: Configure makepkg for ${{ matrix.target.arch }}
+        run: |
+          set -euo pipefail
+          echo "Downloading CachyOS ${{ matrix.target.arch }} makepkg.conf..."
+          curl -sLo /etc/makepkg.conf "https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/${{ matrix.target.profile }}/makepkg.conf"
+          echo "Downloading CachyOS ${{ matrix.target.arch }} rust.conf..."
+          mkdir -p /etc/makepkg.conf.d
+          curl -sLo /etc/makepkg.conf.d/rust.conf "https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/${{ matrix.target.profile }}/rust.conf"
+          sed -i 's/^PKGDEST=/#PKGDEST=/g' /etc/makepkg.conf
+          sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
+          sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
+          echo 'PACKAGECARCH="${{ matrix.target.pkgcarch }}"' >> /etc/makepkg.conf
+
+      - name: Configure pacman options and existing repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DB_NAME: ${{ matrix.target.db }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "${DB_NAME}.db"; then
+          {
+            echo ""
+            echo "[$DB_NAME]"
+            echo "SigLevel = Optional TrustAll"
+            echo "Server = https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG"
+          } >> /etc/pacman.conf
+          fi
+          pacman -Sy
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fix workspace ownership for build user
+        run: chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: Build, Cache and Fallback Logic
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PKG: ${{ matrix.package }}
+          DB_NAME: ${{ matrix.target.db }}
+          TARGET_ARCH: ${{ matrix.target.arch }}
+        run: |
+          set -uo pipefail
+          mkdir -p output /tmp/repo-files /tmp/repo-db
+
+          echo "Fetching database metadata for $DB_NAME..."
+          if gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --dir /tmp/repo-db --pattern "${DB_NAME}.files.tar.gz" 2>/dev/null; then
+            if ! tar -xzf "/tmp/repo-db/${DB_NAME}.files.tar.gz" -C /tmp/repo-files; then
+              echo "::warning::Cannot extract ${DB_NAME}.files.tar.gz; treating as rebuild."
+            fi
+          else
+            echo "::warning::No ${DB_NAME}.files.tar.gz in release '$RELEASE_TAG'; treating as rebuild."
+          fi
+
+          echo "Checking status for $PKG ($TARGET_ARCH)"
+          VCS_PREPASS_OK=true
+          if grep -q 'pkgver()' "$PKG/PKGBUILD"; then
+            if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -od --noprepare --skipinteg"; then
+              echo "::warning::pkgver() pre-pass failed for $PKG; forcing rebuild."
+              VCS_PREPASS_OK=false
+            fi
+          fi
+
+          EXPECTED_PKGS=""
+          if ! EXPECTED_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg --packagelist"); then
+            echo "::warning::makepkg --packagelist failed for $PKG; forcing rebuild."
+            EXPECTED_PKGS=""
+          fi
+          EXPECTED_PKGS="${EXPECTED_PKGS//:/.}"
+
+          NEEDS_BUILD=false
+          if [[ "$VCS_PREPASS_OK" != "true" || -z "$EXPECTED_PKGS" ]]; then
+            NEEDS_BUILD=true
+          else
+            for pkg_path in $EXPECTED_PKGS; do
+              pkg_basename=$(basename "$pkg_path")
+              if ! grep -q -x "$pkg_basename" /tmp/repo-files/*/desc 2>/dev/null; then
+                NEEDS_BUILD=true
+                break
+              fi
+            done
+          fi
+
+          if [[ "$NEEDS_BUILD" == "false" ]]; then
+            echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
+            for pkg_path in $EXPECTED_PKGS; do
+              pkg_basename=$(basename "$pkg_path")
+              if ! gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --dir output --pattern "$pkg_basename"; then
+                echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
+                NEEDS_BUILD=true
+                break
+              fi
+            done
+          fi
+
+          if [[ "$NEEDS_BUILD" == "false" ]]; then
+            echo "$PKG ($TARGET_ARCH)" > "output/status-skipped-${PKG}-${TARGET_ARCH}.txt"
+          else
+            echo "Updating checksums for $PKG..."
+            if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && updpkgsums"; then
+              echo "::warning::updpkgsums failed for $PKG; proceeding with existing checksums."
+            fi
+            echo "Building $PKG ($TARGET_ARCH) with paru"
+            ASSUME_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && source PKGBUILD && echo \${pkgname[@]}")
+            ASSUME_ARGS=""
+            for subpkg in $ASSUME_PKGS; do
+              ASSUME_ARGS="$ASSUME_ARGS --assume-installed $subpkg"
+            done
+            PARU_FLAGS="--noconfirm --skipreview --useask --removemake --nocheck -B$ASSUME_ARGS"
+            if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'"; then
+              echo "::warning::paru exited non-zero for $PKG; checking produced packages."
+            fi
+
+            if ls "$PKG"/*.pkg.tar.zst >/dev/null 2>&1; then
+              mv "$PKG"/*.pkg.tar.zst output/
+              echo "Build OK: $PKG ($TARGET_ARCH)"
+              echo "$PKG ($TARGET_ARCH)" > "output/status-built-${PKG}-${TARGET_ARCH}.txt"
+            else
+              echo "Build failed for $PKG ($TARGET_ARCH). Triggering fallback."
+              FALLBACK_CANDIDATES=()
+              declare -A candidate_seen=()
+              add_candidate() {
+                [[ -n "$1" ]] || return 0
+                [[ -n "${candidate_seen[$1]:-}" ]] && return 0
+                candidate_seen["$1"]=1
+                FALLBACK_CANDIDATES+=("$1")
+              }
+              if [[ -d /tmp/repo-files ]]; then
+                for desc_file in /tmp/repo-files/*/desc; do
+                  [[ -f "$desc_file" ]] || continue
+                  base_pkg=$(awk '/^%BASE%/{getline; print; exit}' "$desc_file")
+                  pkg_name=$(awk '/^%NAME%/{getline; print; exit}' "$desc_file")
+                  check_name="${base_pkg:-$pkg_name}"
+                  [[ "$check_name" == "$PKG" ]] || continue
+                  add_candidate "$(awk '/^%FILENAME%/{getline; print; exit}' "$desc_file")"
+                done
+              fi
+              RESTORED_COUNT=0
+              for file_name in "${FALLBACK_CANDIDATES[@]}"; do
+                if gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --dir output --pattern "$file_name" 2>/dev/null; then
+                  RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
+                fi
+              done
+              if (( RESTORED_COUNT > 0 )); then
+                echo "Restored previous build for $PKG ($TARGET_ARCH)"
+                echo "$PKG ($TARGET_ARCH)" > "output/status-restored-${PKG}-${TARGET_ARCH}.txt"
+              else
+                echo "Fallback failed: no previous file for $PKG ($TARGET_ARCH)"
+                echo "$PKG ($TARGET_ARCH)" > "output/status-failed-${PKG}-${TARGET_ARCH}.txt"
+              fi
+            fi
+          fi
+
+          for f in output/*:* ; do
+            if [[ -f "$f" ]]; then
+              new_f="${f//:/.}"
+              echo "Renaming $f to $new_f"
+              mv "$f" "$new_f"
+            fi
+          done
+
+          sudo -u builder rm -rf "$GITHUB_WORKSPACE/$PKG/src" "$GITHUB_WORKSPACE/$PKG/pkg"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.target.arch }}-${{ matrix.package }}
+          path: output/*
+          if-no-files-found: ignore
+          retention-days: 1
+
+  publish:
+    name: Generate Pacman DB & Publish Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: ghcr.io/archlinux/archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
+          pacman -Syu --noconfirm --needed github-cli pacman-contrib jq
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: output
+          pattern: pkg-*
+          merge-multiple: true
+
+      - name: Generate pacman databases and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd output
+          shopt -s nullglob
+
+          pkgs_all=( *.pkg.tar.zst )
+          if (( ${#pkgs_all[@]} == 0 )); then
+            echo "No packages found. Exiting."
+            exit 0
+          fi
+
+          # Tách biệt các gói v3 và v4
+          pkgs_v3=( *x86_64_v3.pkg.tar.zst *-any.pkg.tar.zst )
+          pkgs_v4=( *x86_64_v4.pkg.tar.zst *-any.pkg.tar.zst )
+
+          REPO="${{ github.repository }}"
+          TAG="${{ env.RELEASE_TAG }}"
+
+          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$REPO" \
+              --title "Arch Package Repository (x86-64-v3 & v4)" \
+              --notes "Automated repository."
+          fi
+
+          # Tải các gói cũ đang có trên release về để bảo toàn DB
+          gh release download "$TAG" --repo "$REPO" --pattern "*.pkg.tar.zst" 2>/dev/null || true
+
+          # Quét lại danh sách sau khi tải thêm file cũ từ release
+          pkgs_v3=( *x86_64_v3.pkg.tar.zst *-any.pkg.tar.zst )
+          pkgs_v4=( *x86_64_v4.pkg.tar.zst *-any.pkg.tar.zst )
+
+          if (( ${#pkgs_v3[@]} > 0 )); then
+            echo "Creating tinhiem (v3) database: ${#pkgs_v3[@]} package(s)"
+            repo-add "tinhiem.db.tar.gz" "${pkgs_v3[@]}"
+          fi
+
+          if (( ${#pkgs_v4[@]} > 0 )); then
+            echo "Creating tinhiem-v4 database: ${#pkgs_v4[@]} package(s)"
+            repo-add "tinhiem-v4.db.tar.gz" "${pkgs_v4[@]}"
+          fi
+
+          # Upload tất cả package và database
+          echo "Uploading packages and databases to release..."
+          upload_files=( *.pkg.tar.zst tinhiem*.db* tinhiem*.files* )
+          gh release upload "$TAG" "${upload_files[@]}" --repo "$REPO" --clobber
+
+          RELEASE_NOTES=$(cat <<EOF
+          ### 📦 Repository Update Summary (x86-64-v3 & x86-64-v4)
+          **Last Updated:** $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          #### Published Packages:
+          $(printf -- '- %s\n' "${pkgs_all[@]}")
+          EOF
+          )
+          gh release edit "$TAG" --repo "$REPO" --notes "$RELEASE_NOTES"
