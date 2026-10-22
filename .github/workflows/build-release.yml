@@ -128,12 +128,12 @@ jobs:
           DB_NAME: ${{ matrix.target.db }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "${DB_NAME}.db"; then
+          if curl -sSLf "https://tinhiem.duckdns.org/${DB_NAME}.db" -o /dev/null 2>/dev/null; then
           {
             echo ""
             echo "[$DB_NAME]"
             echo "SigLevel = Optional TrustAll"
-            echo "Server = https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG"
+            echo "Server = https://tinhiem.duckdns.org/"
           } >> /etc/pacman.conf
           fi
           pacman -Sy
@@ -156,13 +156,13 @@ jobs:
           set -uo pipefail
           mkdir -p output /tmp/repo-files /tmp/repo-db
 
-          echo "Fetching database metadata for $DB_NAME..."
-          if gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --dir /tmp/repo-db --pattern "${DB_NAME}.files.tar.gz" 2>/dev/null; then
+          echo "Fetching database metadata for $DB_NAME from VPS..."
+          if curl -sSLf "https://tinhiem.duckdns.org/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
             if ! tar -xzf "/tmp/repo-db/${DB_NAME}.files.tar.gz" -C /tmp/repo-files; then
               echo "::warning::Cannot extract ${DB_NAME}.files.tar.gz; treating as rebuild."
             fi
           else
-            echo "::warning::No ${DB_NAME}.files.tar.gz in release '$RELEASE_TAG'; treating as rebuild."
+            echo "::warning::No ${DB_NAME}.files.tar.gz on VPS; treating as rebuild."
           fi
 
           echo "Checking status for $PKG ($TARGET_ARCH)"
@@ -198,7 +198,7 @@ jobs:
             echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
             for pkg_path in $EXPECTED_PKGS; do
               pkg_basename=$(basename "$pkg_path")
-              if ! gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --dir output --pattern "$pkg_basename"; then
+              if ! curl -sSLf "https://tinhiem.duckdns.org/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
                 echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
                 NEEDS_BUILD=true
                 break
@@ -251,7 +251,7 @@ jobs:
               fi
               RESTORED_COUNT=0
               for file_name in "${FALLBACK_CANDIDATES[@]}"; do
-                if gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --dir output --pattern "$file_name" 2>/dev/null; then
+                if curl -sSLf "https://tinhiem.duckdns.org/$file_name" -o "output/$file_name" 2>/dev/null; then
                   RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
                 fi
               done
@@ -296,7 +296,7 @@ jobs:
       - name: Install dependencies
         run: |
           sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
-          pacman -Syu --noconfirm --needed github-cli pacman-contrib jq
+          pacman -Syu --noconfirm --needed github-cli pacman-contrib jq openssh rsync curl
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -305,9 +305,15 @@ jobs:
           pattern: pkg-*
           merge-multiple: true
 
-      - name: Generate pacman databases and publish
+      - name: Generate pacman databases, deploy to VPS and update Release Notes
         env:
           GH_TOKEN: ${{ github.token }}
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ env.RELEASE_TAG }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           cd output
@@ -319,23 +325,13 @@ jobs:
             exit 0
           fi
 
-          # Tách biệt các gói v3 và v4
-          pkgs_v3=( *x86_64_v3.pkg.tar.zst *-any.pkg.tar.zst )
-          pkgs_v4=( *x86_64_v4.pkg.tar.zst *-any.pkg.tar.zst )
+          # Tải các gói cũ đang có trên VPS về để bảo toàn danh mục DB đầy đủ
+          echo "Syncing existing packages from VPS to preserve DB entries..."
+          for f in $(curl -sL https://tinhiem.duckdns.org/ | grep -o 'href="\./[^"]*\.pkg\.tar\.zst"' | sed 's/href="\.\///;s/"//' || true); do
+            curl -sSL -z "$f" -o "$f" "https://tinhiem.duckdns.org/$f" 2>/dev/null || true
+          done
 
-          REPO="${{ github.repository }}"
-          TAG="${{ env.RELEASE_TAG }}"
-
-          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$REPO" \
-              --title "Arch Package Repository (x86-64-v3 & v4)" \
-              --notes "Automated repository."
-          fi
-
-          # Tải các gói cũ đang có trên release về để bảo toàn DB
-          gh release download "$TAG" --repo "$REPO" --pattern "*.pkg.tar.zst" 2>/dev/null || true
-
-          # Quét lại danh sách sau khi tải thêm file cũ từ release
+          # Phân chia các gói v3 và v4
           pkgs_v3=( *x86_64_v3.pkg.tar.zst *-any.pkg.tar.zst )
           pkgs_v4=( *x86_64_v4.pkg.tar.zst *-any.pkg.tar.zst )
 
@@ -349,17 +345,49 @@ jobs:
             repo-add "tinhiem-v4.db.tar.gz" "${pkgs_v4[@]}"
           fi
 
-          # Upload tất cả package và database
-          echo "Uploading packages and databases to release..."
-          upload_files=( *.pkg.tar.zst tinhiem*.db* tinhiem*.files* )
-          gh release upload "$TAG" "${upload_files[@]}" --repo "$REPO" --clobber
+          # 1. Cấu hình SSH và Deploy trực tiếp sang VPS
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          echo "Deploying packages and databases to VPS /var/www/repo..."
+          rsync -avz -e "ssh -o StrictHostKeyChecking=accept-new" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
+
+          # 2. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
+          ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
+          from pathlib import Path
+          from collections import defaultdict
+          repo_dir = Path("/var/www/repo")
+          groups = defaultdict(list)
+          for p in repo_dir.glob("*.pkg.tar.zst"):
+              stem = p.name[:-len(".pkg.tar.zst")]
+              parts = stem.rsplit("-", 3)
+              if len(parts) == 4:
+                  pkgname, pkgver, pkgrel, arch = parts
+                  groups[(pkgname, arch)].append(p)
+          for (pkgname, arch), files in groups.items():
+              files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+              for old_file in files[3:]:
+                  old_file.unlink(missing_ok=True)
+          PYEOF'
+
+          # 3. Cập nhật Release Tag trên GitHub (Chỉ lưu Changelog & Notes, KHÔNG lưu file nhị phân)
+          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$REPO" \
+              --title "Arch Package Repository" \
+              --notes "Automated release tag."
+          fi
 
           RELEASE_NOTES=$(cat <<EOF
-          ### 📦 Repository Update Summary (x86-64-v3 & x86-64-v4)
-          **Last Updated:** $(date -u '+%Y-%m-%d %H:%M UTC')
+          ### 📦 Repository Update Summary
+          **Cập nhật lúc:** $(date -u '+%Y-%m-%d %H:%M UTC')
 
-          #### Published Packages:
+          - 🔗 **Changelog / Commit Diff:** https://github.com/${REPO}/commit/${SHA}
+          - 🌐 **Máy chủ tải gói (VPS):** https://tinhiem.duckdns.org/
+
+          #### Danh sách các gói cập nhật trong đợt này:
           $(printf -- '- %s\n' "${pkgs_all[@]}")
           EOF
           )
-          gh release edit "$TAG" --repo "$REPO" --notes "$RELEASE_NOTES"
+          gh release edit "$TAG" --repo "$REPO" --title "Arch Repository Release" --notes "$RELEASE_NOTES"
