@@ -22,6 +22,11 @@ package() {
   install -Dm644 "packaging/linux/ai.storyteller.$pkgname.desktop" \
     "$pkgdir/usr/share/applications/ai.storyteller.$pkgname.desktop"
 
+  if [[ -f "packaging/linux/ai.storyteller.$pkgname.mime.xml" ]]; then
+    install -Dm644 "packaging/linux/ai.storyteller.$pkgname.mime.xml" \
+      "$pkgdir/usr/share/mime/packages/ai.storyteller.$pkgname.xml"
+  fi
+
   for s in 16 24 32 48 64 128 256 512; do
     local icon="assets/app-icon/hicolor/${s}x${s}/apps/ai.storyteller.$pkgname.png"
     if [[ -f "$icon" ]]; then
