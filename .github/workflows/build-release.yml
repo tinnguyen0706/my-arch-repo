@@ -347,13 +347,14 @@ jobs:
           fi
 
           # 1. Cấu hình SSH và Deploy trực tiếp sang VPS
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          mkdir -p "$HOME/.ssh" /root/.ssh 2>/dev/null || true
+          chmod 700 "$HOME/.ssh" /root/.ssh 2>/dev/null || true
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          cp "$HOME/.ssh/id_ed25519" /root/.ssh/id_ed25519 2>/dev/null || true
+          chmod 600 "$HOME/.ssh/id_ed25519" /root/.ssh/id_ed25519 2>/dev/null || true
+          ssh-keyscan -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
-          SSH_CMD="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
+          SSH_CMD="ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
 
           echo "Deploying packages and databases to VPS /var/www/repo..."
           rsync -avz -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
