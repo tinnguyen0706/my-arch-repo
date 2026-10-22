@@ -21,27 +21,28 @@ depends=(
   'gtk3'
 )
 makedepends=(
+  'git'
   'python-build'
   'python-installer'
   'python-wheel'
   'python-poetry-core'
   'python-poetry-dynamic-versioning'
 )
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+source=("git+https://github.com/AdnanHodzic/auto-cpufreq.git#tag=v$pkgver")
+b2sums=('SKIP')
 
 prepare() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   sed -i 's|usr/local|usr|g' "scripts/${pkgname}.service" auto_cpufreq/core.py 2>/dev/null || true
 }
 
 build() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   POETRY_DYNAMIC_VERSIONING_BYPASS=1 python -m build --wheel --no-isolation
 }
 
 package() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   python -m installer --destdir="$pkgdir" dist/*.whl
 
   install -Dm644 scripts/org.auto-cpufreq.pkexec.policy -t "$pkgdir/usr/share/polkit-1/actions/"
