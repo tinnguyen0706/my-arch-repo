@@ -3,6 +3,7 @@
 xdg-desktop-portal-umbriel-git
 umbriel-git
 waywallen-display
+open-wallpaper-engine
 
 #####
 # Storytold Craft Apps (Official GitHub tags, compiled for x86-64-v3 & v4)
@@ -19,4 +20,3 @@ local:zalo
 local:fcitx5-lotus
 local:tex-fmt
 local:waywallen
-local:open-wallpaper-engine-bin

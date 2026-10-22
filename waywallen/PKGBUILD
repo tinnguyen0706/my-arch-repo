@@ -19,7 +19,7 @@ makedepends=(git cmake cargo "lito>=0.8.5" "clang>=22" lld llvm vulkan-headers n
              qt6-tools)
 optdepends=(
     'waywallen-display: Desktop integration for waywallen'
-    'open-wallpaper-engine-bin: Open source wallpaper engine implement mostly for linux'
+    'open-wallpaper-engine: Open source scene renderer, mostly for linux.'
 )
 options=(!lto)
 source=("git+https://github.com/waywallen/waywallen.git#tag=v$pkgver"

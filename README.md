@@ -40,7 +40,7 @@ sudo pacman -S umbriel-git
 ```
 
 # Cài đặt Waywallen và bộ tích hợp Wallpaper Engine:
-sudo pacman -S waywallen waywallen-display open-wallpaper-engine-bin
+sudo pacman -S waywallen waywallen-display open-wallpaper-engine
 
 ---
 
@@ -61,4 +61,4 @@ sudo pacman -S waywallen waywallen-display open-wallpaper-engine-bin
 | `zalo` | GitHub `VN-Linux-Family` | Zalo cho Linux bản gốc chính thức (Original, không ZaDark) |
 | `waywallen` | GitHub `waywallen/waywallen` | Wallpaper Manager for Linux (compile v3/v4 native) |
 | `waywallen-display` | AUR / GitHub | Desktop integration for waywallen (layer-shell client cho Niri/Wayland) |
-| `open-wallpaper-engine-bin` | GitHub `waywallen` | Plugin giải mã Scene & Web của Wallpaper Engine cho Waywallen |
+| `open-wallpaper-engine` | AUR / GitHub | Open source scene renderer, mostly for linux. (Plugin cho Waywallen) |
