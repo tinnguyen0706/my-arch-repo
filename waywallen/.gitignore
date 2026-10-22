@@ -1,0 +1,7 @@
+*
+!0001-cmake-Use-system-VulkanMemoryAllocator.patch
+!0002-cmake-Use-system-Corrosion.patch
+!PKGBUILD
+!.SRCINFO
+!.nvchecker.toml
+!.gitignore

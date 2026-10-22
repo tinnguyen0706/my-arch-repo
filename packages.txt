@@ -2,6 +2,7 @@
 # AUR packages (Auto-synced from AUR, compiled for x86-64-v3 & v4)
 xdg-desktop-portal-umbriel-git
 umbriel-git
+waywallen-display
 
 #####
 # Storytold Craft Apps (Official GitHub tags, compiled for x86-64-v3 & v4)
@@ -17,3 +18,5 @@ local:auto-cpufreq
 local:zalo
 local:fcitx5-lotus
 local:tex-fmt
+local:waywallen
+local:open-wallpaper-engine-bin

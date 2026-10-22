@@ -39,6 +39,9 @@ sudo pacman -S tex-fmt
 sudo pacman -S umbriel-git
 ```
 
+# Cài đặt Waywallen và bộ tích hợp Wallpaper Engine:
+sudo pacman -S waywallen waywallen-display open-wallpaper-engine-bin
+
 ---
 
 ## 🛠️ Danh sách các gói được duy trì
@@ -56,3 +59,6 @@ sudo pacman -S umbriel-git
 | `pdfcraft` | GitHub `storytold/pdfcraft` | Ứng dụng đọc và chỉnh sửa PDF thuần Rust (Acrobat-style) |
 | `auto-cpufreq` | GitHub `AdnanHodzic` | Tối ưu hóa xung nhịp CPU và pin laptop tự động (bản mới nhất v3.2.0) |
 | `zalo` | GitHub `VN-Linux-Family` | Zalo cho Linux bản gốc chính thức (Original, không ZaDark) |
+| `waywallen` | GitHub `waywallen/waywallen` | Wallpaper Manager for Linux (compile v3/v4 native) |
+| `waywallen-display` | AUR / GitHub | Desktop integration for waywallen (layer-shell client cho Niri/Wayland) |
+| `open-wallpaper-engine-bin` | GitHub `waywallen` | Plugin giải mã Scene & Web của Wallpaper Engine cho Waywallen |
