@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Zalo
+Comment=Zalo for Linux (Official Original)
+Exec=/usr/bin/zalo %U
+Icon=zalo
+Terminal=false
+Type=Application
+Categories=Network;InstantMessaging;
+StartupWMClass=zalo
+MimeType=x-scheme-handler/zalo;

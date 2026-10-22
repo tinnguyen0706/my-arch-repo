@@ -1,0 +1,12 @@
+pkgbase = tex-fmt
+	pkgdesc = An extremely fast LaTeX formatter written in Rust
+	pkgver = 0.5.7
+	pkgrel = 1
+	url = https://github.com/WGUNDERWOOD/tex-fmt
+	arch = x86_64
+	license = MIT
+	makedepends = cargo
+	source = tex-fmt-0.5.7.tar.gz::https://github.com/WGUNDERWOOD/tex-fmt/archive/refs/tags/v0.5.7.tar.gz
+	sha256sums = fee9ccd8f13be00cf437ce73928892eb0b55349bd4c81e226bc3fd3cb9de644c
+
+pkgname = tex-fmt
