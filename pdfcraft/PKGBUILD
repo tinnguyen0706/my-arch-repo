@@ -6,7 +6,7 @@ arch=('x86_64')
 url="https://github.com/storytold/pdfcraft"
 license=('MIT' 'Apache-2.0')
 depends=('glibc' 'libgcc' 'hicolor-icon-theme')
-makedepends=('cargo' 'git')
+makedepends=('cargo' 'git' 'cmake' 'clang' 'perl')
 provides=('printcraft')
 conflicts=('printcraft')
 replaces=('printcraft')
@@ -15,6 +15,8 @@ b2sums=('SKIP')
 
 build() {
   cd "$pkgname"
+  export CFLAGS+=' -fno-lto'
+  export CXXFLAGS+=' -fno-lto'
   cargo build --release --locked -p "$pkgname"
 }
 
