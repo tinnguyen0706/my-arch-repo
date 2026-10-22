@@ -590,7 +590,16 @@ jobs:
           # Tải các gói cũ đang có trên VPS về để bảo toàn danh mục DB đầy đủ
           echo "Syncing existing packages from VPS to preserve DB entries..."
           for f in $(curl -sL https://tinhiem.duckdns.org/ | grep -o 'href="\./[^"]*\.pkg\.tar\.zst"' | sed 's/href="\.\///;s/"//' || true); do
-            curl -sSL -z "$f" -o "$f" "https://tinhiem.duckdns.org/$f" 2>/dev/null || true
+            if [[ ! -f "$f" ]]; then
+              curl -sSL -o "$f" "https://tinhiem.duckdns.org/$f" 2>/dev/null || true
+            fi
+          done
+
+          for f in *.pkg.tar.zst; do
+            if [[ ! -s "$f" ]]; then
+              echo "Removing empty/invalid package file $f"
+              rm -f "$f"
+            fi
           done
 
           # Phân chia các gói v3 và v4
