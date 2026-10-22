@@ -656,7 +656,7 @@ jobs:
 
           RELEASE_NOTES=$(cat <<EOF
           ### 📦 Repository Update Summary
-          **Cập nhật lúc:** $(date -u '+%Y-%m-%d %H:%M UTC')
+          **Cập nhật lúc:** $(TZ='Asia/Ho_Chi_Minh' date '+%Y-%m-%d %H:%M (UTC+7)')
 
           - 🔗 **Changelog / Commit Diff:** https://github.com/${REPO}/commit/${SHA}
           - 🌐 **Máy chủ tải gói (VPS):** https://tinhiem.duckdns.org/
