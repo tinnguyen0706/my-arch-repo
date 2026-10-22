@@ -5,9 +5,6 @@ pkgdesc="Complete office suite from storytold (wordcraft, gridcraft, deckcraft, 
 arch=('any')
 url="https://github.com/storytold"
 license=('MIT' 'Apache-2.0')
-provides=('story-office')
-conflicts=('story-office')
-replaces=('story-office')
 depends=(
   'wordcraft'
   'gridcraft'
