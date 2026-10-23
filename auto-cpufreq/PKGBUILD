@@ -1,6 +1,6 @@
 pkgname=auto-cpufreq
 pkgver=3.2.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Automatic CPU speed & power optimizer for Linux"
 arch=('any')
 url="https://github.com/AdnanHodzic/auto-cpufreq"
@@ -33,7 +33,8 @@ b2sums=('SKIP')
 
 prepare() {
   cd "$pkgname"
-  sed -i 's|usr/local|usr|g' "scripts/${pkgname}.service" auto_cpufreq/core.py 2>/dev/null || true
+  sed -i 's|/usr/local|/usr|g' auto_cpufreq/gui/app.py auto_cpufreq/gui/objects.py auto_cpufreq/core.py auto_cpufreq/bin/auto_cpufreq.py "scripts/${pkgname}.service" 2>/dev/null || true
+  sed -i 's|usr/local|usr|g' "scripts/${pkgname}.service" 2>/dev/null || true
 }
 
 build() {
@@ -48,6 +49,7 @@ package() {
   install -Dm644 scripts/org.auto-cpufreq.pkexec.policy -t "$pkgdir/usr/share/polkit-1/actions/"
   install -Dm644 images/icon.png "$pkgdir/usr/share/pixmaps/auto-cpufreq.png"
   install -Dm644 images/icon.png -t "$pkgdir/usr/share/$pkgname/"
+  install -Dm644 images/icon.png -t "$pkgdir/usr/share/$pkgname/images/"
 
   mkdir -p "$pkgdir/usr/share/$pkgname/scripts/"
   install -Dm755 scripts/auto-cpufreq-install.sh "$pkgdir/usr/share/$pkgname/scripts/"
