@@ -1,5 +1,5 @@
 pkgname=gridcraft
-pkgver=0.10.0
+pkgver=0.11.1
 pkgrel=1
 pkgdesc="An open-source, clean-room spreadsheet (Excel-style) in pure Rust"
 arch=('x86_64')
