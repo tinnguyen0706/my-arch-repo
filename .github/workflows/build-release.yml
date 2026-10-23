@@ -141,7 +141,7 @@ jobs:
           rustup default stable
           sudo -u builder rustup default stable
           if [[ "${{ matrix.package }}" == "waywallen" || "${{ matrix.package }}" == "open-wallpaper-engine" ]]; then
-            sudo -u builder paru -S --noconfirm --removemake lito
+            sudo -u builder paru -S --noconfirm --removemake lito-bin || sudo -u builder paru -S --noconfirm --removemake lito
           fi
 
       - name: Configure makepkg for ${{ matrix.target.arch }}
@@ -156,6 +156,11 @@ jobs:
           sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
           sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
           echo 'PACKAGECARCH="${{ matrix.target.pkgcarch }}"' >> /etc/makepkg.conf
+          mkdir -p /etc/profile.d
+          echo 'export CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/profile.d/cargo-host.sh
+          echo 'export CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/profile.d/cargo-host.sh
+          echo 'CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/environment
+          echo 'CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/environment
 
       - name: Configure pacman options and existing repository
         env:
@@ -349,7 +354,7 @@ jobs:
           rustup default stable
           sudo -u builder rustup default stable
           if [[ "${{ matrix.package }}" == "waywallen" || "${{ matrix.package }}" == "open-wallpaper-engine" ]]; then
-            sudo -u builder paru -S --noconfirm --removemake lito
+            sudo -u builder paru -S --noconfirm --removemake lito-bin || sudo -u builder paru -S --noconfirm --removemake lito
           fi
 
       - name: Configure makepkg for ${{ matrix.target.arch }}
@@ -364,6 +369,11 @@ jobs:
           sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
           sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
           echo 'PACKAGECARCH="${{ matrix.target.pkgcarch }}"' >> /etc/makepkg.conf
+          mkdir -p /etc/profile.d
+          echo 'export CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/profile.d/cargo-host.sh
+          echo 'export CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/profile.d/cargo-host.sh
+          echo 'CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/environment
+          echo 'CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/environment
 
       - name: Configure pacman options and existing repository
         env:
