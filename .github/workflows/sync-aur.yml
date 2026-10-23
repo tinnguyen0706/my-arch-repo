@@ -144,10 +144,37 @@ jobs:
                   latest_ver="${latest_tag#v}"
                   current_ver=$(grep -E '^pkgver=' "$pkg/PKGBUILD" | head -n 1 | cut -d= -f2 | tr -d '"'\'' ')
 
+                  has_commithash=$(grep -E '^_commithash=' "$pkg/PKGBUILD" | head -n 1 | cut -d= -f2 | tr -d '"'\'' ' || true)
+                  latest_hash=""
+                  if [[ -n "$has_commithash" ]]; then
+                    mapfile -t release_assets < <(gh api "repos/$gh_repo/releases/latest" --jq '.assets[].name' 2>/dev/null || true)
+                    for asset in "${release_assets[@]}"; do
+                      extracted_hash=$(echo "$asset" | grep -oE '[-_][0-9a-f]{7,10}[-_\.]' | head -n 1 | tr -d '-_.' || true)
+                      if [[ -n "$extracted_hash" ]]; then
+                        latest_hash="$extracted_hash"
+                        break
+                      fi
+                    done
+                    if [[ -z "$latest_hash" ]]; then
+                      latest_hash=$(gh api "repos/$gh_repo/commits/$latest_tag" --jq '.sha[:7]' 2>/dev/null || true)
+                    fi
+                  fi
+
+                  pkg_changed=false
                   if [[ -n "$latest_ver" && "$latest_ver" != "$current_ver" ]]; then
                     echo "New upstream release detected for $pkg ($gh_repo): $current_ver -> $latest_ver"
                     sed -i "s/^pkgver=.*/pkgver=$latest_ver/" "$pkg/PKGBUILD"
                     sed -i "s/^pkgrel=.*/pkgrel=1/" "$pkg/PKGBUILD"
+                    pkg_changed=true
+                  fi
+
+                  if [[ -n "$has_commithash" && -n "$latest_hash" && "$latest_hash" != "$has_commithash" ]]; then
+                    echo "New upstream commit hash detected for $pkg ($gh_repo): $has_commithash -> $latest_hash"
+                    sed -i "s/^_commithash=.*/_commithash=$latest_hash/" "$pkg/PKGBUILD"
+                    pkg_changed=true
+                  fi
+
+                  if [[ "$pkg_changed" == "true" ]]; then
                     touch "$STATUS_DIR/synced/$pkg"
                     exit 0
                   fi
