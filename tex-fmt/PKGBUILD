@@ -22,7 +22,13 @@ build() {
   cd "$srcdir/$pkgname"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR=target
-  cargo build --frozen --release --all-features
+  if check_option lto y; then
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+  fi
+  export CFLAGS+=' -fno-lto'
+  export CXXFLAGS+=' -fno-lto'
+  cargo build --frozen --release --all-features --target "$CARCH-unknown-linux-gnu"
 }
 
 check() {
@@ -33,7 +39,7 @@ check() {
 
 package() {
   cd "$srcdir/$pkgname"
-  install -Dm0755 "target/release/$pkgname" -t "$pkgdir/usr/bin/"
+  install -Dm0755 "target/$CARCH-unknown-linux-gnu/release/$pkgname" -t "$pkgdir/usr/bin/"
   install -vDm644 "man/$pkgname.1" "$pkgdir/usr/share/man/man1/$pkgname.1"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 

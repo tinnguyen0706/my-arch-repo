@@ -8,7 +8,7 @@ arch=(x86_64)
 url=https://github.com/waywallen/waywallen-display
 license=(MIT)
 depends=(libgcc libstdc++ glibc)
-makedepends=(cmake vulkan-headers vulkan-icd-loader libglvnd qt6-base qt6-declarative cargo)
+makedepends=(cmake vulkan-headers vulkan-icd-loader libglvnd qt6-base qt6-declarative cargo glslang)
 optdepends=(
     'libglvnd: EGL backend'
     'vulkan-icd-loader: Vulkan backend'
@@ -34,14 +34,21 @@ build() {
     cd "$pkgname-$pkgver"
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
+    if check_option lto y; then
+        export CARGO_PROFILE_RELEASE_LTO=thin
+        export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+    fi
+    export CFLAGS+=' -fno-lto'
+    export CXXFLAGS+=' -fno-lto'
     RUST_BACKTRACE=full cargo build --frozen --release --all-features \
+        --target "$CARCH-unknown-linux-gnu" \
         --package waywallen-display \
         --bin waywallen-layer-shell
 }
 
 package() {
     DESTDIR="$pkgdir" cmake --install build
-    find "$pkgname-$pkgver/target/release" -type f -executable -maxdepth 1 \
+    find "$pkgname-$pkgver/target/$CARCH-unknown-linux-gnu/release" -type f -executable -maxdepth 1 \
         -printf "Installing %p...\n" \
         -exec install -Dm0755 -t "$pkgdir/usr/bin" {} +
     install -Dm0644 "$pkgname-$pkgver/LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
