@@ -18,14 +18,12 @@ build() {
   fi
   export CFLAGS+=' -fno-lto'
   export CXXFLAGS+=' -fno-lto'
-  export CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"
-  export CARGO_TARGET_APPLIES_TO_HOST=false
-  cargo build --release --locked -p "$pkgname"
+  cargo build --release --locked --target "$CARCH-unknown-linux-gnu" -p "$pkgname"
 }
 
 package() {
   cd "$pkgname"
-  install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+  install -Dm755 "target/$CARCH-unknown-linux-gnu/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
 
   install -Dm644 "packaging/linux/ai.storyteller.$pkgname.desktop" \
     "$pkgdir/usr/share/applications/ai.storyteller.$pkgname.desktop"
