@@ -76,4 +76,5 @@ package() {
     install -Dvm755 -t "$pkgdir/usr/lib/$pkgname" \
         "$pkgname/build/plain/bin/owe-sceneviewer/SceneViewer" \
         "$pkgname/build/plain/bin/owe-webviewer/WebViewer"
+    install -Dm644 "$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
