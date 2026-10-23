@@ -140,6 +140,8 @@ jobs:
             echo ""
             echo "[chaotic-aur]"
             echo "SigLevel = Optional TrustAll"
+            echo "Server = https://geo-mirror.chaotic.cx/chaotic-aur/x86_64"
+            echo "Server = https://builds.garudalinux.org/repos/chaotic-aur/x86_64"
             echo "Server = https://cdn-mirror.chaotic.cx/chaotic-aur/x86_64"
           } >> /etc/pacman.conf
           fi
@@ -358,6 +360,8 @@ jobs:
             echo ""
             echo "[chaotic-aur]"
             echo "SigLevel = Optional TrustAll"
+            echo "Server = https://geo-mirror.chaotic.cx/chaotic-aur/x86_64"
+            echo "Server = https://builds.garudalinux.org/repos/chaotic-aur/x86_64"
             echo "Server = https://cdn-mirror.chaotic.cx/chaotic-aur/x86_64"
           } >> /etc/pacman.conf
           fi
@@ -577,7 +581,7 @@ jobs:
       - name: Install dependencies
         run: |
           sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
-          pacman -Syu --noconfirm --needed github-cli pacman-contrib jq openssh rsync curl
+          pacman -Syu --noconfirm --needed github-cli pacman-contrib jq openssh rsync curl python
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
