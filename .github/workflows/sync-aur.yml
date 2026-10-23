@@ -149,7 +149,7 @@ jobs:
                   if [[ -n "$has_commithash" ]]; then
                     mapfile -t release_assets < <(gh api "repos/$gh_repo/releases/latest" --jq '.assets[].name' 2>/dev/null || true)
                     for asset in "${release_assets[@]}"; do
-                      extracted_hash=$(echo "$asset" | grep -oE '[-_][0-9a-f]{7,10}[-_\.]' | head -n 1 | tr -d '-_.' || true)
+                      extracted_hash=$(echo "$asset" | sed -nE 's/.*[-_]([0-9a-f]{7,10})[-_\.].*/\1/p' | head -n 1 || true)
                       if [[ -n "$extracted_hash" ]]; then
                         latest_hash="$extracted_hash"
                         break
