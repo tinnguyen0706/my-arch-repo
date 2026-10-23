@@ -38,4 +38,10 @@ package() {
   if [[ -f "$svg" ]]; then
     install -Dm644 "$svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/ai.storyteller.$pkgname.svg"
   fi
+
+  for lic in LICENSE-APACHE LICENSE-MIT LICENSE; do
+    if [[ -f "$lic" ]]; then
+      install -Dm644 "$lic" "$pkgdir/usr/share/licenses/$pkgname/$lic"
+    fi
+  done
 }
