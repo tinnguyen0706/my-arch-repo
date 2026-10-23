@@ -1,6 +1,6 @@
 pkgname=auto-cpufreq
 pkgver=3.2.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Automatic CPU speed & power optimizer for Linux"
 arch=('any')
 url="https://github.com/AdnanHodzic/auto-cpufreq"
@@ -28,13 +28,14 @@ makedepends=(
   'python-poetry-core'
   'python-poetry-dynamic-versioning'
 )
-source=("git+https://github.com/AdnanHodzic/auto-cpufreq.git#tag=v$pkgver")
-b2sums=('SKIP')
+source=("git+https://github.com/AdnanHodzic/auto-cpufreq.git#tag=v$pkgver"
+        "auto-cpufreq.service")
+b2sums=('SKIP'
+        'SKIP')
 
 prepare() {
   cd "$pkgname"
-  sed -i 's|/usr/local|/usr|g' auto_cpufreq/gui/app.py auto_cpufreq/gui/objects.py auto_cpufreq/core.py auto_cpufreq/bin/auto_cpufreq.py "scripts/${pkgname}.service" 2>/dev/null || true
-  sed -i 's|usr/local|usr|g' "scripts/${pkgname}.service" 2>/dev/null || true
+  sed -i 's|/usr/local|/usr|g' auto_cpufreq/gui/app.py auto_cpufreq/gui/objects.py auto_cpufreq/core.py auto_cpufreq/bin/auto_cpufreq.py scripts/auto-cpufreq-install.sh scripts/auto-cpufreq-remove.sh 2>/dev/null || true
 }
 
 build() {
@@ -54,7 +55,8 @@ package() {
   mkdir -p "$pkgdir/usr/share/$pkgname/scripts/"
   install -Dm755 scripts/auto-cpufreq-install.sh "$pkgdir/usr/share/$pkgname/scripts/"
   install -Dm755 scripts/auto-cpufreq-remove.sh "$pkgdir/usr/share/$pkgname/scripts/"
-  install -Dm644 scripts/auto-cpufreq.service "$pkgdir/usr/lib/systemd/system/$pkgname.service"
+  install -Dm644 "$srcdir/auto-cpufreq.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
+  install -Dm644 "$srcdir/auto-cpufreq.service" "$pkgdir/usr/share/$pkgname/scripts/$pkgname.service"
   install -Dm755 scripts/cpufreqctl.sh "$pkgdir/usr/share/$pkgname/scripts/"
   install -Dm644 scripts/style.css "$pkgdir/usr/share/$pkgname/scripts/"
   install -Dm644 scripts/auto-cpufreq-gtk.desktop -t "$pkgdir/usr/share/applications/"
