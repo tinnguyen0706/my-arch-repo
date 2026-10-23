@@ -613,7 +613,7 @@ jobs:
 
           # 2. Đồng bộ toàn bộ các file gói đang có trên VPS về runner
           echo "Syncing all existing packages from VPS via rsync..."
-          rsync -avz -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/*.pkg.tar.zst" ./ || true
+          rsync -av --ignore-existing -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/*.pkg.tar.zst" ./ || true
 
           for f in *.pkg.tar.zst; do
             if [[ ! -s "$f" ]]; then
@@ -643,7 +643,7 @@ jobs:
           fi
 
           echo "Deploying packages and databases to VPS /var/www/repo..."
-          rsync -avz -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
+          rsync -av -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
 
           # 2. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
           $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
