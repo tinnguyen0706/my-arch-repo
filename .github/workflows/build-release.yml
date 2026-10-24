@@ -1,9 +1,6 @@
 name: Build and Publish Arch Repository (v3 & v4)
 
 on:
-  schedule:
-    # Chạy mỗi giờ (vào phút thứ 15)
-    - cron: '15 * * * *'
   push:
     branches: [main]
     paths-ignore:
@@ -17,7 +14,7 @@ permissions:
 
 concurrency:
   group: release-repo
-  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+  cancel-in-progress: true
 
 env:
   RELEASE_TAG: repository
@@ -43,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "Scheduled or manual run: scanning all packages."
             pkgs=()
             for dir in */ ; do
