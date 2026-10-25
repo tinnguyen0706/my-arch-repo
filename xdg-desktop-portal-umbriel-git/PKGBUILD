@@ -32,7 +32,7 @@ optdepends=(
   'slurp: color picking'
 )
 provides=('xdg-desktop-portal-umbriel')
-conflicts=('xdg-desktop-portal-umbriel' 'xdg-desktop-portal-umbriel-bin')
+conflicts=('xdg-desktop-portal-umbriel')
 source=('git+https://github.com/noctalia-dev/xdg-desktop-portal-umbriel.git#branch=main')
 b2sums=('SKIP')
 
