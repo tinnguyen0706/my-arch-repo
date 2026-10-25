@@ -8,7 +8,7 @@ arch=('x86_64')
 url="https://github.com/LotusInputMethod/fcitx5-lotus"
 license=('GPL-3.0-or-later')
 provides=('fcitx5-lotus')
-conflicts=('fcitx5-lotus')
+conflicts=('fcitx5-lotus-bin' 'fcitx5-lotus-git')
 depends=(
   'acl'
   'fcitx5'

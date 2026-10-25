@@ -40,7 +40,7 @@ makedepends=(
   'wayland-protocols'
 )
 provides=('umbriel')
-conflicts=('umbriel')
+conflicts=('umbriel' 'umbriel-bin')
 source=('git+https://github.com/noctalia-dev/umbriel.git#branch=main')
 b2sums=('SKIP')
 

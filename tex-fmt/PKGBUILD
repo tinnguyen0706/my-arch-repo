@@ -7,6 +7,8 @@ pkgdesc="An extremely fast LaTeX formatter written in Rust"
 arch=('x86_64')
 url="https://github.com/WGUNDERWOOD/tex-fmt"
 license=('MIT')
+provides=('tex-fmt')
+conflicts=('tex-fmt-bin' 'tex-fmt-git')
 depends=('glibc' 'gcc-libs')
 makedepends=('cargo' 'git')
 source=("git+https://github.com/WGUNDERWOOD/tex-fmt.git#tag=v$pkgver")

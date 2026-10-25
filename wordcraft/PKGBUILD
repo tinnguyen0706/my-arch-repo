@@ -5,6 +5,8 @@ pkgdesc="An open-source, clean-room reimplementation of Microsoft Word in pure R
 arch=('x86_64')
 url="https://github.com/storytold/wordcraft"
 license=('MIT' 'Apache-2.0')
+provides=('wordcraft')
+conflicts=('wordcraft-bin' 'wordcraft-git')
 depends=('glibc' 'libgcc' 'hicolor-icon-theme')
 makedepends=('cargo' 'git')
 source=("git+https://github.com/storytold/wordcraft.git#tag=v$pkgver")

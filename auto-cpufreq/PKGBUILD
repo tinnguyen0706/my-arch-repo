@@ -5,6 +5,8 @@ pkgdesc="Automatic CPU speed & power optimizer for Linux"
 arch=('any')
 url="https://github.com/AdnanHodzic/auto-cpufreq"
 license=('GPL-3.0-or-later')
+provides=('auto-cpufreq')
+conflicts=('auto-cpufreq-git' 'auto-cpufreq-rust-git')
 depends=(
   'python'
   'python-setuptools'

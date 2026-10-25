@@ -7,11 +7,15 @@ url="https://github.com/storytold/pdfcraft"
 license=('MIT' 'Apache-2.0')
 depends=('glibc' 'libgcc' 'hicolor-icon-theme')
 makedepends=('cargo' 'git' 'cmake' 'clang' 'perl')
-provides=('printcraft')
-conflicts=('printcraft')
+provides=('pdfcraft' 'printcraft')
+conflicts=('pdfcraft-bin' 'pdfcraft-git' 'printcraft' 'printcraft-git')
 replaces=('printcraft')
-source=("git+https://github.com/storytold/pdfcraft.git#tag=v$pkgver")
-b2sums=('SKIP')
+source=("git+https://github.com/storytold/pdfcraft.git#tag=v$pkgver"
+        "text-detection.rten::https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten"
+        "text-recognition.rten::https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten")
+sha256sums=('SKIP'
+            'f15cfb56bd02c4bf478a20343986504a1f01e1665c2b3a0ad66340f054b1b5ca'
+            'e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e')
 
 build() {
   cd "$pkgname"
@@ -53,4 +57,8 @@ package() {
       install -Dm644 "$lic" "$pkgdir/usr/share/licenses/$pkgname/$lic"
     fi
   done
+
+  # Install pre-trained OCR models (Scan & OCR text recognition)
+  install -Dm644 "$srcdir/text-detection.rten" "$pkgdir/usr/share/$pkgname/models/text-detection.rten"
+  install -Dm644 "$srcdir/text-recognition.rten" "$pkgdir/usr/share/$pkgname/models/text-recognition.rten"
 }

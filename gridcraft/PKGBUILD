@@ -5,6 +5,8 @@ pkgdesc="An open-source, clean-room spreadsheet (Excel-style) in pure Rust"
 arch=('x86_64')
 url="https://github.com/storytold/gridcraft"
 license=('MIT' 'Apache-2.0')
+provides=('gridcraft')
+conflicts=('gridcraft-bin' 'gridcraft-git')
 depends=('glibc' 'libgcc' 'hicolor-icon-theme')
 makedepends=('cargo' 'git')
 source=("git+https://github.com/storytold/gridcraft.git#tag=v$pkgver")

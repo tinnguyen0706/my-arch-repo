@@ -13,6 +13,8 @@ install=waywallen.install
 arch=(x86_64)
 url=https://github.com/waywallen/waywallen
 license=(MIT)
+provides=('waywallen')
+conflicts=('waywallen-bin' 'waywallen-git')
 depends=(libgcc libstdc++ glibc ffmpeg mesa sqlite vulkan-icd-loader
          qt6-base qt6-declarative qt6-grpc qt6-websockets zstd)
 makedepends=(git cmake cargo "lito>=0.8.5" "clang>=22" lld llvm vulkan-headers ninja
