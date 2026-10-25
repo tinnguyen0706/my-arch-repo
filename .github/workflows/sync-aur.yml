@@ -148,15 +148,25 @@ jobs:
                   latest_hash=""
                   if [[ -n "$has_commithash" ]]; then
                     mapfile -t release_assets < <(gh api "repos/$gh_repo/releases/latest" --jq '.assets[].name' 2>/dev/null || true)
+                    # Ưu tiên lấy commit hash từ asset x86_64 của bản Original (nếu có)
                     for asset in "${release_assets[@]}"; do
-                      extracted_hash=$(echo "$asset" | sed -nE 's/.*[-_]([0-9a-f]{7,10})[-_\.].*/\1/p' | head -n 1 || true)
-                      if [[ -n "$extracted_hash" ]]; then
-                        latest_hash="$extracted_hash"
-                        break
+                      if [[ "$asset" == *Original*x86_64* ]]; then
+                        extracted_hash=$(echo "$asset" | sed -nE 's/.*[-_]([0-9a-f]{7,10})[-_\.].*/\1/p' | head -n 1 || true)
+                        if [[ -n "$extracted_hash" ]]; then
+                          latest_hash="$extracted_hash"
+                          break
+                        fi
                       fi
                     done
+                    # Nếu không tìm thấy trong Original x86_64, duyệt các assets khác của release
                     if [[ -z "$latest_hash" ]]; then
-                      latest_hash=$(gh api "repos/$gh_repo/commits/$latest_tag" --jq '.sha[:7]' 2>/dev/null || true)
+                      for asset in "${release_assets[@]}"; do
+                        extracted_hash=$(echo "$asset" | sed -nE 's/.*[-_]([0-9a-f]{7,10})[-_\.].*/\1/p' | head -n 1 || true)
+                        if [[ -n "$extracted_hash" ]]; then
+                          latest_hash="$extracted_hash"
+                          break
+                        fi
+                      done
                     fi
                   fi
 
