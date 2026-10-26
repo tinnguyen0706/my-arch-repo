@@ -172,12 +172,12 @@ jobs:
           DB_NAME: ${{ matrix.target.db }}
         run: |
           set -euo pipefail
-          if curl -sSLf "https://tinhiem.duckdns.org/${DB_NAME}.db" -o /dev/null 2>/dev/null; then
+          if curl -sSLf "https://arch.tinhiem.id.vn/${DB_NAME}.db" -o /dev/null 2>/dev/null; then
           {
             echo ""
             echo "[$DB_NAME]"
             echo "SigLevel = Optional TrustAll"
-            echo "Server = https://tinhiem.duckdns.org/"
+            echo "Server = https://arch.tinhiem.id.vn/"
           } >> /etc/pacman.conf
           fi
           pacman -Sy
@@ -201,7 +201,7 @@ jobs:
           mkdir -p output /tmp/repo-files /tmp/repo-db
 
           echo "Fetching database metadata for $DB_NAME from VPS..."
-          if curl -sSLf "https://tinhiem.duckdns.org/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
+          if curl -sSLf "https://arch.tinhiem.id.vn/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
             if ! tar -xzf "/tmp/repo-db/${DB_NAME}.files.tar.gz" -C /tmp/repo-files; then
               echo "::warning::Cannot extract ${DB_NAME}.files.tar.gz; treating as rebuild."
             fi
@@ -242,7 +242,7 @@ jobs:
             echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
             for pkg_path in $EXPECTED_PKGS; do
               pkg_basename=$(basename "$pkg_path")
-              if ! curl -sSLf "https://tinhiem.duckdns.org/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
+              if ! curl -sSLf "https://arch.tinhiem.id.vn/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
                 echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
                 NEEDS_BUILD=true
                 break
@@ -295,7 +295,7 @@ jobs:
               fi
               RESTORED_COUNT=0
               for file_name in "${FALLBACK_CANDIDATES[@]}"; do
-                if curl -sSLf "https://tinhiem.duckdns.org/$file_name" -o "output/$file_name" 2>/dev/null; then
+                if curl -sSLf "https://arch.tinhiem.id.vn/$file_name" -o "output/$file_name" 2>/dev/null; then
                   RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
                 fi
               done
@@ -392,12 +392,12 @@ jobs:
           DB_NAME: ${{ matrix.target.db }}
         run: |
           set -euo pipefail
-          if curl -sSLf "https://tinhiem.duckdns.org/${DB_NAME}.db" -o /dev/null 2>/dev/null; then
+          if curl -sSLf "https://arch.tinhiem.id.vn/${DB_NAME}.db" -o /dev/null 2>/dev/null; then
           {
             echo ""
             echo "[$DB_NAME]"
             echo "SigLevel = Optional TrustAll"
-            echo "Server = https://tinhiem.duckdns.org/"
+            echo "Server = https://arch.tinhiem.id.vn/"
           } >> /etc/pacman.conf
           fi
           pacman -Sy
@@ -439,7 +439,7 @@ jobs:
           mkdir -p output /tmp/repo-files /tmp/repo-db
 
           echo "Fetching database metadata for $DB_NAME from VPS..."
-          if curl -sSLf "https://tinhiem.duckdns.org/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
+          if curl -sSLf "https://arch.tinhiem.id.vn/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
             if ! tar -xzf "/tmp/repo-db/${DB_NAME}.files.tar.gz" -C /tmp/repo-files; then
               echo "::warning::Cannot extract ${DB_NAME}.files.tar.gz; treating as rebuild."
             fi
@@ -480,7 +480,7 @@ jobs:
             echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
             for pkg_path in $EXPECTED_PKGS; do
               pkg_basename=$(basename "$pkg_path")
-              if ! curl -sSLf "https://tinhiem.duckdns.org/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
+              if ! curl -sSLf "https://arch.tinhiem.id.vn/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
                 echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
                 NEEDS_BUILD=true
                 break
@@ -533,7 +533,7 @@ jobs:
               fi
               RESTORED_COUNT=0
               for file_name in "${FALLBACK_CANDIDATES[@]}"; do
-                if curl -sSLf "https://tinhiem.duckdns.org/$file_name" -o "output/$file_name" 2>/dev/null; then
+                if curl -sSLf "https://arch.tinhiem.id.vn/$file_name" -o "output/$file_name" 2>/dev/null; then
                   RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
                 fi
               done
@@ -724,7 +724,7 @@ jobs:
           **Cập nhật lúc:** $(TZ='Asia/Ho_Chi_Minh' date '+%Y-%m-%d %H:%M (UTC+7)')
 
           - 🔗 **Changelog / Commit Diff:** https://github.com/${REPO}/commit/${SHA}
-          - 🌐 **Máy chủ tải gói (VPS):** https://tinhiem.duckdns.org/
+          - 🌐 **Máy chủ tải gói (VPS):** https://arch.tinhiem.id.vn/
 
           #### ✅ Gói mới biên dịch thành công:
           ${BUILT_LOG:-None}
