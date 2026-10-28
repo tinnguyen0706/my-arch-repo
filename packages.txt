@@ -5,7 +5,7 @@ umbriel-git
 open-wallpaper-engine
 
 #####
-# Storytold Craft Apps (Official GitHub tags, compiled for x86-64-v3 & v4)
+# Storytold Craft Apps (Compiled for x86-64-v3 & v4; office-craft meta package is generic 'any')
 local:wordcraft
 local:gridcraft
 local:deckcraft
@@ -13,7 +13,7 @@ local:pdfcraft
 local:office-craft
 
 #####
-# Local packages (Auto-checked from GitHub Releases)
+# Local packages (Compiled v3/v4; generic packages like auto-cpufreq and zalo are populated to both DBs)
 local:auto-cpufreq
 local:zalo
 local:fcitx5-lotus

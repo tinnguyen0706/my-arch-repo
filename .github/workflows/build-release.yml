@@ -91,9 +91,46 @@ jobs:
             esac
           done
 
+          build_matrix() {
+            python3 - "$@" << 'PYEOF'
+          import json, sys
+          from pathlib import Path
+
+          pkgs = sys.argv[1:]
+          matrix = []
+          for pkg in pkgs:
+              p = Path(pkg) / 'PKGBUILD'
+              content = p.read_text() if p.exists() else ''
+              is_any = any(line.strip().startswith(('arch=(\'any\')', 'arch=(any)')) for line in content.splitlines())
+              has_compile = any(tool in content for tool in ['cargo build', 'cmake', 'meson', 'make '])
+              is_generic = is_any or not has_compile
+
+              matrix.append({
+                  'package': pkg,
+                  'target': {
+                      'arch': 'generic' if is_generic else 'v3',
+                      'profile': 'docker-makepkg-v3',
+                      'pkgcarch': 'any' if is_any else ('x86_64' if is_generic else 'x86_64_v3'),
+                      'db': 'tinhiem'
+                  }
+              })
+              if not is_generic:
+                  matrix.append({
+                      'package': pkg,
+                      'target': {
+                          'arch': 'v4',
+                          'profile': 'docker-makepkg-v4',
+                          'pkgcarch': 'x86_64_v4',
+                          'db': 'tinhiem-v4'
+                      }
+                  })
+          print(json.dumps(matrix))
+          PYEOF
+          }
+
           if (( ${#wave1[@]} > 0 )); then
             echo "has_wave1=true" >> "$GITHUB_OUTPUT"
-            echo "matrix_wave1=$(printf '%s\n' "${wave1[@]}" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
+            echo "matrix_wave1=$(build_matrix "${wave1[@]}")" >> "$GITHUB_OUTPUT"
           else
             echo "has_wave1=false" >> "$GITHUB_OUTPUT"
             echo "matrix_wave1=[]" >> "$GITHUB_OUTPUT"
@@ -101,7 +138,7 @@ jobs:
 
           if (( ${#wave2[@]} > 0 )); then
             echo "has_wave2=true" >> "$GITHUB_OUTPUT"
-            echo "matrix_wave2=$(printf '%s\n' "${wave2[@]}" | jq -R . | jq -s -c .)" >> "$GITHUB_OUTPUT"
+            echo "matrix_wave2=$(build_matrix "${wave2[@]}")" >> "$GITHUB_OUTPUT"
           else
             echo "has_wave2=false" >> "$GITHUB_OUTPUT"
             echo "matrix_wave2=[]" >> "$GITHUB_OUTPUT"
@@ -117,16 +154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.prepare.outputs.matrix_wave1) }}
-        target:
-          - arch: v3
-            profile: docker-makepkg-v3
-            pkgcarch: x86_64_v3
-            db: tinhiem
-          - arch: v4
-            profile: docker-makepkg-v4
-            pkgcarch: x86_64_v4
-            db: tinhiem-v4
+        include: ${{ fromJson(needs.prepare.outputs.matrix_wave1) }}
     steps:
       - name: Install base dependencies
         run: |
@@ -337,16 +365,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.prepare.outputs.matrix_wave2) }}
-        target:
-          - arch: v3
-            profile: docker-makepkg-v3
-            pkgcarch: x86_64_v3
-            db: tinhiem
-          - arch: v4
-            profile: docker-makepkg-v4
-            pkgcarch: x86_64_v4
-            db: tinhiem-v4
+        include: ${{ fromJson(needs.prepare.outputs.matrix_wave2) }}
     steps:
       - name: Install base dependencies
         run: |
@@ -653,9 +672,9 @@ jobs:
           for (pkgname, arch), items in groups.items():
               items.sort(key=functools.cmp_to_key(lambda x, y: cmp_versions(x[0], y[0])), reverse=True)
               top_pkg = items[0][1]
-              if arch in ('x86_64_v3', 'any'):
+              if arch in ('x86_64', 'x86_64_v3', 'any'):
                   latest_v3.append(top_pkg)
-              if arch in ('x86_64_v4', 'any'):
+              if arch in ('x86_64', 'x86_64_v4', 'any'):
                   latest_v4.append(top_pkg)
 
           Path('pkgs_v3.txt').write_text('\n'.join(sorted(latest_v3)))
