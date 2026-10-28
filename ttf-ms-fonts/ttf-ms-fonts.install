@@ -1,30 +1,65 @@
 #!/bin/bash
 
-# Target directory for fonts
+# Extract Microsoft Windows 11 fonts from official ISO via remote range requests
+# Backend logic derived from ttf-ms-win11-base (uses python + wimlib)
+
 FONT_DIR="/usr/share/fonts/TTF"
-CACHE_DIR="/var/cache/ttf-ms-fonts"
-SOURCE_URL="https://github.com/liblaf/win-fonts/releases/download/Win11/Win11-English.zip"
+SCRIPTS_DIR="/usr/share/ttf-ms-fonts"
+EXTRACT_CACHE="/var/cache/ttf-ms-fonts"
 
 post_install() {
-    echo ":: Downloading and extracting Microsoft Windows 11 fonts..."
-    mkdir -p "$FONT_DIR" "$CACHE_DIR"
+    echo ":: [ttf-ms-fonts] Starting Windows 11 font extraction..."
+    echo ":: Target source: Official Microsoft Enterprise Evaluation ISO"
+    echo ":: Using HTTP Range streaming (downloading only font blobs via remote WIM extraction)..."
 
-    local tmp_zip="$CACHE_DIR/Win11-English.zip"
+    mkdir -p "$FONT_DIR" "$EXTRACT_CACHE"
 
-    # Download with curl showing progress
-    if curl -fL --retry 3 --connect-timeout 15 -o "$tmp_zip" "$SOURCE_URL"; then
-        echo ":: Extracting fonts to $FONT_DIR..."
-        bsdtar -xf "$tmp_zip" -C "$FONT_DIR" --include="*.ttf" --include="*.TTF" --include="*.ttc" --include="*.TTC"
-        rm -f "$tmp_zip"
-        chmod 644 "$FONT_DIR"/* 2>/dev/null || true
+    if ! source "$SCRIPTS_DIR/fontdata.sh" 2>/dev/null; then
+        echo "==> ERROR: Could not source font metadata from $SCRIPTS_DIR/fontdata.sh" >&2
+        return 1
+    fi
 
-        echo ":: Updating font cache..."
+    local -a wim_paths=()
+    for font in "${_ttf_ms_win11_all[@]}"; do
+        wim_paths+=("Windows/Fonts/${font}")
+    done
+
+    # Run extraction using the packaged python script
+    if python "$SCRIPTS_DIR/remote_wim.py" --url "${_iso}" extract \
+        --output-dir "$EXTRACT_CACHE" \
+        --glob 'Windows/System32/Licenses/neutral/*/*/license.rtf' \
+        "${wim_paths[@]}"; then
+
+        echo ":: Verifying and copying extracted font files to $FONT_DIR..."
+        local font_src="$EXTRACT_CACHE/Windows/Fonts"
+        local copied=0
+
+        for font in "${_ttf_ms_win11_all[@]}"; do
+            if [[ -f "$font_src/$font" ]]; then
+                install -Dm644 "$font_src/$font" "$FONT_DIR/$font"
+                ((copied++))
+            fi
+        done
+
+        # Copy license if found
+        shopt -s nullglob
+        local license_matches=("$EXTRACT_CACHE"/Windows/System32/Licenses/neutral/*/*/license.rtf)
+        shopt -u nullglob
+        if (( ${#license_matches[@]} > 0 )); then
+            install -Dm644 "${license_matches[0]}" "/usr/share/licenses/ttf-ms-fonts/license.rtf"
+        fi
+
+        # Cleanup cache
+        rm -rf "$EXTRACT_CACHE"
+
+        echo ":: Updating system font cache (fc-cache)..."
         fc-cache -f "$FONT_DIR" >/dev/null 2>&1 || true
-        echo ":: Microsoft Windows 11 fonts successfully installed."
+
+        echo ":: [ttf-ms-fonts] Successfully installed $copied Microsoft TrueType fonts."
     else
-        echo "==> ERROR: Failed to download Windows 11 fonts." >&2
-        echo "==> You can manually download $SOURCE_URL" >&2
-        echo "==> and extract the font files (.ttf, .ttc) into $FONT_DIR." >&2
+        echo "==> ERROR: Font extraction failed." >&2
+        echo "==> Check your network connection to Microsoft download servers." >&2
+        echo "==> You can re-run installation anytime or manually copy fonts into $FONT_DIR." >&2
     fi
 }
 
@@ -33,7 +68,7 @@ post_upgrade() {
 }
 
 post_remove() {
-    echo ":: Note: Extracted font files in $FONT_DIR were retained."
+    echo ":: Note: Installed font files in $FONT_DIR were retained."
     echo ":: If you want to remove them completely, delete Windows font files from $FONT_DIR"
     echo ":: and run 'fc-cache -f'."
 }
