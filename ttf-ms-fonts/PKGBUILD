@@ -10,13 +10,11 @@ provides=('ttf-font' 'ttf-ms-win11' 'ttf-tahoma' 'emoji-font')
 conflicts=('ttf-ms-win11' 'ttf-ms-win11-auto' 'ttf-ms-win11-base' 'ttf-tahoma' 'ttf-vista-fonts')
 install="${pkgname}.install"
 source=(
-  fontdata.sh
   remote_udf.py
   remote_wim_core.py
   remote_wim.py
 )
 sha256sums=(
-  'b1e60444e1efd00428820fa11b5d20a112f6d211369103c5b8d87275b028956f'
   '37fe786f08d00a86381b999f1c80f80d39e2188eed92c33bea89e1ed9e8d26ce'
   '15c2b5cdd0f424704fd7cf056cc86a3a677f23f104f12fa329515c6604ea27b8'
   'd48f4d6563201d1acb8beca17a108248f6d3292da26233617cdcd07785c31200'
@@ -24,7 +22,6 @@ sha256sums=(
 
 package() {
   install -dm755 "$pkgdir/usr/share/$pkgname"
-  install -m644 "$srcdir/fontdata.sh" "$pkgdir/usr/share/$pkgname/"
   install -m644 "$srcdir/remote_udf.py" "$pkgdir/usr/share/$pkgname/"
   install -m644 "$srcdir/remote_wim_core.py" "$pkgdir/usr/share/$pkgname/"
   install -m755 "$srcdir/remote_wim.py" "$pkgdir/usr/share/$pkgname/"

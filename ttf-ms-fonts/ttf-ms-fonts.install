@@ -33,12 +33,9 @@ post_install() {
         iso_url=$(resolve_iso_url "$MS_FWLINK_FALLBACK")
     fi
 
-    # Final static fallback if Microsoft redirect servers are temporarily unreachable
+    # Final static fallback if Microsoft fwlinks are temporarily unreachable
     if [[ -z "$iso_url" ]]; then
-        if [[ -f "$SCRIPTS_DIR/fontdata.sh" ]]; then
-            source "$SCRIPTS_DIR/fontdata.sh" 2>/dev/null || true
-            iso_url="$_iso"
-        fi
+        iso_url="https://software-static.download.prss.microsoft.com/dbazure/26300.9457.260913-1737.26h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
     fi
 
     if [[ -z "$iso_url" ]]; then
