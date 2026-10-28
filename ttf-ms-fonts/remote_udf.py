@@ -108,7 +108,7 @@ class HttpRangeReader:
         cmd = [
             "curl",
             "-sL",
-            "-4",
+            "--happy-eyeballs-timeout-ms", "200",
             "--retry", "5",
             "--retry-delay", "1",
             "--connect-timeout", "15",
@@ -135,7 +135,7 @@ class HttpRangeReader:
             cmd = [
                 "curl",
                 "-sIL",
-                "-4",
+                "--happy-eyeballs-timeout-ms", "200",
                 "--connect-timeout", "15",
                 "-A", self.user_agent,
                 self.url,
