@@ -1,27 +1,12 @@
 from __future__ import annotations
 
 import re
-import socket
 import struct
+import subprocess
 import threading
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from time import perf_counter
-
-# Force IPv4 fallback when IPv6 routing is broken (avoids Errno 101 Network is unreachable)
-_orig_getaddrinfo = socket.getaddrinfo
-
-def _safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    try:
-        res = _orig_getaddrinfo(host, port, family, type, proto, flags)
-        # Prioritize IPv4 addresses first to avoid unreachable IPv6 routes
-        return sorted(res, key=lambda x: 0 if x[0] == socket.AF_INET else 1)
-    except Exception:
-        return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-
-socket.getaddrinfo = _safe_getaddrinfo
 
 SECTOR_SIZE = 2048
 HTTP_TIMEOUT = 60
@@ -119,50 +104,49 @@ class HttpRangeReader:
         self.timing = timing or TimingStats(enabled=False)
 
     def _request(self, start: int, end: int) -> bytes:
-        request = urllib.request.Request(
-            self.url,
-            headers={
-                "Range": f"bytes={start}-{end}",
-                "User-Agent": self.user_agent,
-                "Accept-Encoding": "identity",
-                "Connection": "close",
-            },
-        )
-
-        for attempt in range(1, HTTP_RETRIES + 1):
-            try:
-                request_start = perf_counter()
-                with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
-                    status = getattr(response, "status", None)
-                    if status != 206:
-                        raise ProbeError(
-                            f"server did not honor range request: HTTP {status}"
-                        )
-                    content_range = response.headers.get("Content-Range")
-                    if self.size is None and content_range:
-                        match = re.match(r"bytes \d+-\d+/(\d+)", content_range)
-                        if match:
-                            self.size = int(match.group(1))
-                    data = response.read()
-                self.timing.record_http(perf_counter() - request_start, len(data))
-                break
-            except (TimeoutError, urllib.error.URLError, OSError) as exc:
-                if attempt == HTTP_RETRIES:
-                    raise ProbeError(
-                        f"range request failed after {HTTP_RETRIES} attempts: {exc}"
-                    ) from exc
-                time.sleep(min(2 * attempt, 10))
-
         expected = end - start + 1
+        cmd = [
+            "curl",
+            "-sL",
+            "-4",
+            "--retry", "5",
+            "--retry-delay", "1",
+            "--connect-timeout", "15",
+            "-r", f"{start}-{end}",
+            "-A", self.user_agent,
+            self.url,
+        ]
+
+        request_start = perf_counter()
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res.returncode != 0:
+            err_msg = res.stderr.decode("utf-8", errors="replace").strip()
+            raise ProbeError(f"curl range request failed (code {res.returncode}): {err_msg}")
+
+        data = res.stdout
+        self.timing.record_http(perf_counter() - request_start, len(data))
+
         if len(data) != expected:
             raise ProbeError(f"short read: expected {expected} bytes, got {len(data)}")
         return data
 
     def probe(self) -> int:
         if self.size is None:
-            self._request(0, 0)
+            cmd = [
+                "curl",
+                "-sIL",
+                "-4",
+                "--connect-timeout", "15",
+                "-A", self.user_agent,
+                self.url,
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for line in res.stdout.splitlines():
+                m = re.match(r"(?i)content-length:\s*(\d+)", line.strip())
+                if m:
+                    self.size = int(m.group(1))
         if self.size is None:
-            raise ProbeError("could not determine remote file size")
+            raise ProbeError("could not determine remote file size via curl")
         return self.size
 
     def read_at(self, offset: int, size: int) -> bytes:
