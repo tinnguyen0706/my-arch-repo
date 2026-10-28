@@ -1,5 +1,5 @@
 pkgname=ttf-ms-fonts
-pkgver=1.0.0
+pkgver=11.0.26100.1
 pkgrel=1
 pkgdesc="Microsoft Windows 11 TrueType fonts (HTTP range installer package)"
 arch=('any')
