@@ -64,7 +64,7 @@ if python3 "$SCRIPTS_DIR/remote_wim.py" --url "$iso_url" extract \
     for font_file in "${extracted_fonts[@]}"; do
         base_name="${font_file##*/}"
         install -Dm644 "$font_file" "$FONT_DIR/$base_name"
-        ((copied++))
+        copied=$((copied + 1))
     done
 
     # Install license file if found
