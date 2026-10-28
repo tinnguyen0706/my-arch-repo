@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Target directory for fonts
+FONT_DIR="/usr/share/fonts/TTF"
+CACHE_DIR="/var/cache/ttf-ms-fonts"
+SOURCE_URL="https://github.com/liblaf/win-fonts/releases/download/Win11/Win11-English.zip"
+
+post_install() {
+    echo ":: Downloading and extracting Microsoft Windows 11 fonts..."
+    mkdir -p "$FONT_DIR" "$CACHE_DIR"
+
+    local tmp_zip="$CACHE_DIR/Win11-English.zip"
+
+    # Download with curl showing progress
+    if curl -fL --retry 3 --connect-timeout 15 -o "$tmp_zip" "$SOURCE_URL"; then
+        echo ":: Extracting fonts to $FONT_DIR..."
+        bsdtar -xf "$tmp_zip" -C "$FONT_DIR" --include="*.ttf" --include="*.TTF" --include="*.ttc" --include="*.TTC"
+        rm -f "$tmp_zip"
+        chmod 644 "$FONT_DIR"/* 2>/dev/null || true
+
+        echo ":: Updating font cache..."
+        fc-cache -f "$FONT_DIR" >/dev/null 2>&1 || true
+        echo ":: Microsoft Windows 11 fonts successfully installed."
+    else
+        echo "==> ERROR: Failed to download Windows 11 fonts." >&2
+        echo "==> You can manually download $SOURCE_URL" >&2
+        echo "==> and extract the font files (.ttf, .ttc) into $FONT_DIR." >&2
+    fi
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    echo ":: Note: Extracted font files in $FONT_DIR were retained."
+    echo ":: If you want to remove them completely, delete Windows font files from $FONT_DIR"
+    echo ":: and run 'fc-cache -f'."
+}

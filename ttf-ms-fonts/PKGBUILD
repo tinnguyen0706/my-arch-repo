@@ -1,0 +1,34 @@
+pkgname=ttf-ms-fonts
+pkgver=11.0.26100
+pkgrel=1
+pkgdesc="Microsoft Windows 11 TrueType fonts (installer package)"
+arch=('any')
+url="https://www.microsoft.com/typography/fonts/"
+license=('custom')
+depends=('curl' 'fontconfig' 'tar')
+provides=('ttf-font' 'ttf-ms-win11' 'ttf-tahoma' 'emoji-font')
+conflicts=('ttf-ms-win11' 'ttf-ms-win11-auto' 'ttf-tahoma' 'ttf-vista-fonts')
+install="${pkgname}.install"
+
+package() {
+  install -d "$pkgdir/usr/share/licenses/$pkgname"
+  cat << 'EOF' > "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+Microsoft Windows Fonts License / EULA:
+
+Usage of Microsoft fonts outside running Windows system is governed by
+Microsoft's End User License Agreement (EULA).
+
+This package acts as an installer that retrieves Windows 11 fonts
+directly during post-installation on the user's system and does not
+redistribute proprietary font binaries within the package repository.
+EOF
+
+  install -d "$pkgdir/usr/share/doc/$pkgname"
+  cat << 'EOF' > "$pkgdir/usr/share/doc/$pkgname/README"
+Microsoft Windows 11 Fonts Installer
+
+This package automatically downloads and extracts official Microsoft Windows 11
+TrueType fonts (Arial, Times New Roman, Calibri, Segoe UI, Tahoma, Consolas,
+Cambria, Bahnschrift, etc.) into /usr/share/fonts/TTF/ upon installation.
+EOF
+}

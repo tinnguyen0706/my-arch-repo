@@ -20,3 +20,4 @@ local:fcitx5-lotus
 local:tex-fmt
 local:waywallen-display
 local:waywallen
+local:ttf-ms-fonts

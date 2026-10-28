@@ -1,0 +1,21 @@
+pkgbase = ttf-ms-fonts
+	pkgdesc = Microsoft Windows 11 TrueType fonts (installer package)
+	pkgver = 11.0.26100
+	pkgrel = 1
+	url = https://www.microsoft.com/typography/fonts/
+	install = ttf-ms-fonts.install
+	arch = any
+	license = custom
+	depends = curl
+	depends = fontconfig
+	depends = tar
+	provides = ttf-font
+	provides = ttf-ms-win11
+	provides = ttf-tahoma
+	provides = emoji-font
+	conflicts = ttf-ms-win11
+	conflicts = ttf-ms-win11-auto
+	conflicts = ttf-tahoma
+	conflicts = ttf-vista-fonts
+
+pkgname = ttf-ms-fonts
