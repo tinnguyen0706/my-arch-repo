@@ -132,6 +132,32 @@ class HttpRangeReader:
 
     def probe(self) -> int:
         if self.size is None:
+            # Method 1: Ask for byte 0 with headers included (-i -r 0-0)
+            # Microsoft / Fastly CDN returns 206 Partial Content with: Content-Range: bytes 0-0/TOTAL_SIZE
+            cmd = [
+                "curl",
+                "-s",
+                "-i",
+                "-r", "0-0",
+                "--happy-eyeballs-timeout-ms", "200",
+                "--connect-timeout", "15",
+                "-A", self.user_agent,
+                self.url,
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res.returncode == 0:
+                headers = res.stdout.split(b"\r\n\r\n")[0].decode("utf-8", errors="replace")
+                for line in headers.splitlines():
+                    m = re.match(r"(?i)content-range:\s*bytes\s+\d+-\d+/(\d+)", line.strip())
+                    if m:
+                        self.size = int(m.group(1))
+                        break
+                    m_len = re.match(r"(?i)content-length:\s*(\d+)", line.strip())
+                    if m_len and int(m_len.group(1)) > 1:
+                        self.size = int(m_len.group(1))
+
+        # Fallback to HEAD request if Content-Range wasn't returned
+        if self.size is None:
             cmd = [
                 "curl",
                 "-sIL",
@@ -143,8 +169,9 @@ class HttpRangeReader:
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             for line in res.stdout.splitlines():
                 m = re.match(r"(?i)content-length:\s*(\d+)", line.strip())
-                if m:
+                if m and int(m.group(1)) > 1000:
                     self.size = int(m.group(1))
+
         if self.size is None:
             raise ProbeError("could not determine remote file size via curl")
         return self.size

@@ -1,7 +1,7 @@
 pkgbase = ttf-ms-fonts
 	pkgdesc = Microsoft Windows 11 TrueType fonts (HTTP range installer package)
 	pkgver = 1.0.0
-	pkgrel = 4
+	pkgrel = 5
 	url = https://www.microsoft.com/typography/fonts/
 	install = ttf-ms-fonts.install
 	arch = any
@@ -21,7 +21,7 @@ pkgbase = ttf-ms-fonts
 	source = remote_udf.py
 	source = remote_wim_core.py
 	source = remote_wim.py
-	sha256sums = e7985d03d2530a527577c18f872b8ef20906b4fc104e67a1a39da6946cde3d81
+	sha256sums = a7d1ead251bf9f527c9e8127dedd044151a1bbdb1cbe28f01842985805744833
 	sha256sums = 15c2b5cdd0f424704fd7cf056cc86a3a677f23f104f12fa329515c6604ea27b8
 	sha256sums = d48f4d6563201d1acb8beca17a108248f6d3292da26233617cdcd07785c31200
 
