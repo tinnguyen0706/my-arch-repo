@@ -1,47 +1,81 @@
 #!/bin/bash
 
 # Extract Microsoft Windows 11 fonts from official ISO via remote range requests
-# Backend logic derived from ttf-ms-win11-base (uses python + wimlib)
+# Dynamically resolves the latest official ISO URL from Microsoft fwlink
 
 FONT_DIR="/usr/share/fonts/TTF"
 SCRIPTS_DIR="/usr/share/ttf-ms-fonts"
 EXTRACT_CACHE="/var/cache/ttf-ms-fonts"
 
+# Microsoft Evaluation Center permanent fwlink for 64-bit Windows 11 Enterprise ISO
+MS_FWLINK_PRIMARY="https://go.microsoft.com/fwlink/?linkid=2382600"
+MS_FWLINK_FALLBACK="https://aka.ms/Win11E-ISO-25H2-en-us"
+
+resolve_iso_url() {
+    local target="$1"
+    local resolved=""
+    resolved=$(curl -sIL -o /dev/null -w "%{url_effective}" --connect-timeout 15 --retry 2 "$target" 2>/dev/null)
+    if [[ "$resolved" =~ \.iso$ ]]; then
+        echo "$resolved"
+        return 0
+    fi
+    return 1
+}
+
 post_install() {
-    echo ":: [ttf-ms-fonts] Starting Windows 11 font extraction..."
-    echo ":: Target source: Official Microsoft Enterprise Evaluation ISO"
-    echo ":: Using HTTP Range streaming (downloading only font blobs via remote WIM extraction)..."
+    echo ":: [ttf-ms-fonts] Resolving latest official Microsoft Windows 11 ISO..."
 
-    mkdir -p "$FONT_DIR" "$EXTRACT_CACHE"
+    local iso_url=""
+    iso_url=$(resolve_iso_url "$MS_FWLINK_PRIMARY")
 
-    if ! source "$SCRIPTS_DIR/fontdata.sh" 2>/dev/null; then
-        echo "==> ERROR: Could not source font metadata from $SCRIPTS_DIR/fontdata.sh" >&2
+    if [[ -z "$iso_url" ]]; then
+        echo ":: Primary link busy, attempting fallback redirect..."
+        iso_url=$(resolve_iso_url "$MS_FWLINK_FALLBACK")
+    fi
+
+    # Final static fallback if Microsoft redirect servers are temporarily unreachable
+    if [[ -z "$iso_url" ]]; then
+        if [[ -f "$SCRIPTS_DIR/fontdata.sh" ]]; then
+            source "$SCRIPTS_DIR/fontdata.sh" 2>/dev/null || true
+            iso_url="$_iso"
+        fi
+    fi
+
+    if [[ -z "$iso_url" ]]; then
+        echo "==> ERROR: Could not resolve Windows 11 ISO URL from Microsoft." >&2
         return 1
     fi
 
-    local -a wim_paths=()
-    for font in "${_ttf_ms_win11_all[@]}"; do
-        wim_paths+=("Windows/Fonts/${font}")
-    done
+    local iso_name="${iso_url##*/}"
+    echo ":: Connected to upstream ISO: $iso_name"
+    echo ":: Using HTTP Range streaming to extract fonts (downloading only font chunks)..."
 
-    # Run extraction using the packaged python script
-    if python "$SCRIPTS_DIR/remote_wim.py" --url "${_iso}" extract \
+    mkdir -p "$FONT_DIR" "$EXTRACT_CACHE"
+
+    # Dynamic extraction:
+    # 1. Matches all TrueType (*.ttf, *.ttc) in Windows/Fonts/ dynamically (picks up any new/updated fonts)
+    # 2. Matches license file
+    if python "$SCRIPTS_DIR/remote_wim.py" --url "$iso_url" extract \
         --output-dir "$EXTRACT_CACHE" \
-        --glob 'Windows/System32/Licenses/neutral/*/*/license.rtf' \
-        "${wim_paths[@]}"; then
+        --glob 'Windows/Fonts/*.ttf' \
+        --glob 'Windows/Fonts/*.ttc' \
+        --glob 'Windows/System32/Licenses/neutral/*/*/license.rtf'; then
 
-        echo ":: Verifying and copying extracted font files to $FONT_DIR..."
+        echo ":: Installing extracted font files to $FONT_DIR..."
         local font_src="$EXTRACT_CACHE/Windows/Fonts"
         local copied=0
 
-        for font in "${_ttf_ms_win11_all[@]}"; do
-            if [[ -f "$font_src/$font" ]]; then
-                install -Dm644 "$font_src/$font" "$FONT_DIR/$font"
-                ((copied++))
-            fi
+        shopt -s nullglob
+        local extracted_fonts=("$font_src"/*.[tT][tT][fc])
+        shopt -u nullglob
+
+        for font_file in "${extracted_fonts[@]}"; do
+            local base_name="${font_file##*/}"
+            install -Dm644 "$font_file" "$FONT_DIR/$base_name"
+            ((copied++))
         done
 
-        # Copy license if found
+        # Install license file if found
         shopt -s nullglob
         local license_matches=("$EXTRACT_CACHE"/Windows/System32/Licenses/neutral/*/*/license.rtf)
         shopt -u nullglob
@@ -52,14 +86,13 @@ post_install() {
         # Cleanup cache
         rm -rf "$EXTRACT_CACHE"
 
-        echo ":: Updating system font cache (fc-cache)..."
+        echo ":: Updating font cache (fc-cache)..."
         fc-cache -f "$FONT_DIR" >/dev/null 2>&1 || true
 
         echo ":: [ttf-ms-fonts] Successfully installed $copied Microsoft TrueType fonts."
     else
         echo "==> ERROR: Font extraction failed." >&2
-        echo "==> Check your network connection to Microsoft download servers." >&2
-        echo "==> You can re-run installation anytime or manually copy fonts into $FONT_DIR." >&2
+        echo "==> Ensure python, wimlib, and internet connection to Microsoft are functioning." >&2
     fi
 }
 

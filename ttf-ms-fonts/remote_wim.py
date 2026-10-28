@@ -99,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--output-dir", required=True)
     extract_parser.add_argument("--jobs", type=int, default=8)
     extract_parser.add_argument("--glob", action="append", default=[])
-    extract_parser.add_argument("wim_paths", nargs="+")
+    extract_parser.add_argument("wim_paths", nargs="*", default=[])
     extract_parser.set_defaults(func=command_extract)
 
     return parser
