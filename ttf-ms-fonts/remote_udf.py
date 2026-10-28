@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import socket
 import struct
 import threading
 import time
@@ -9,6 +10,18 @@ import urllib.request
 from dataclasses import dataclass
 from time import perf_counter
 
+# Force IPv4 fallback when IPv6 routing is broken (avoids Errno 101 Network is unreachable)
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    try:
+        res = _orig_getaddrinfo(host, port, family, type, proto, flags)
+        # Prioritize IPv4 addresses first to avoid unreachable IPv6 routes
+        return sorted(res, key=lambda x: 0 if x[0] == socket.AF_INET else 1)
+    except Exception:
+        return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+socket.getaddrinfo = _safe_getaddrinfo
 
 SECTOR_SIZE = 2048
 HTTP_TIMEOUT = 60
