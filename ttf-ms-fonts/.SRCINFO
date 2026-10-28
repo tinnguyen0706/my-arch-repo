@@ -1,6 +1,6 @@
 pkgbase = ttf-ms-fonts
 	pkgdesc = Microsoft Windows 11 TrueType fonts (HTTP range installer package)
-	pkgver = 11.0.26100.1
+	pkgver = 1.0.0
 	pkgrel = 1
 	url = https://www.microsoft.com/typography/fonts/
 	install = ttf-ms-fonts.install

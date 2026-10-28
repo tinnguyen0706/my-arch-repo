@@ -634,6 +634,9 @@ jobs:
           # 2. Đồng bộ toàn bộ các file gói đang có trên VPS về runner
           echo "Syncing all existing packages from VPS via rsync..."
           rsync -av --ignore-existing -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/*.pkg.tar.zst" ./ || true
+          # Purge old unwanted test packages from VPS and runner workspace
+          rm -f ttf-ms-fonts-11*.pkg.tar.zst
+          $SSH_CMD "${VPS_USER}@${VPS_HOST}" "rm -f /var/www/repo/ttf-ms-fonts-11*.pkg.tar.zst" || true
 
           for f in *.pkg.tar.zst; do
             if [[ ! -s "$f" ]]; then
