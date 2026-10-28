@@ -1,96 +1,21 @@
 #!/bin/bash
 
-# Extract Microsoft Windows 11 fonts from official ISO via remote range requests
-# Dynamically resolves the latest official ISO URL from Microsoft fwlink
-
 FONT_DIR="/usr/share/fonts/TTF"
-SCRIPTS_DIR="/usr/share/ttf-ms-fonts"
-EXTRACT_CACHE="/var/cache/ttf-ms-fonts"
-
-# Microsoft Evaluation Center permanent fwlink for 64-bit Windows 11 Enterprise ISO
-MS_FWLINK_PRIMARY="https://go.microsoft.com/fwlink/?linkid=2382600"
-MS_FWLINK_FALLBACK="https://aka.ms/Win11E-ISO-25H2-en-us"
-
-resolve_iso_url() {
-    local target="$1"
-    local resolved=""
-    resolved=$(curl -sIL -o /dev/null -w "%{url_effective}" --connect-timeout 15 --retry 2 "$target" 2>/dev/null)
-    if [[ "$resolved" =~ \.iso$ ]]; then
-        echo "$resolved"
-        return 0
-    fi
-    return 1
-}
 
 post_install() {
-    echo ":: [ttf-ms-fonts] Resolving latest official Microsoft Windows 11 ISO..."
-
-    local iso_url=""
-    iso_url=$(resolve_iso_url "$MS_FWLINK_PRIMARY")
-
-    if [[ -z "$iso_url" ]]; then
-        echo ":: Primary link busy, attempting fallback redirect..."
-        iso_url=$(resolve_iso_url "$MS_FWLINK_FALLBACK")
-    fi
-
-    # Final static fallback if Microsoft fwlinks are temporarily unreachable
-    if [[ -z "$iso_url" ]]; then
-        iso_url="https://software-static.download.prss.microsoft.com/dbazure/26300.9457.260913-1737.26h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
-    fi
-
-    if [[ -z "$iso_url" ]]; then
-        echo "==> ERROR: Could not resolve Windows 11 ISO URL from Microsoft." >&2
-        return 1
-    fi
-
-    local iso_name="${iso_url##*/}"
-    echo ":: Connected to upstream ISO: $iso_name"
-    echo ":: Using HTTP Range streaming to extract fonts (downloading only font chunks)..."
-
-    mkdir -p "$FONT_DIR" "$EXTRACT_CACHE"
-
-    # Dynamic extraction:
-    # 1. Matches all TrueType (*.ttf, *.ttc) in Windows/Fonts/ dynamically (picks up any new/updated fonts)
-    # 2. Matches license file
-    if python "$SCRIPTS_DIR/remote_wim.py" --url "$iso_url" extract \
-        --output-dir "$EXTRACT_CACHE" \
-        --glob 'Windows/Fonts/*.ttf' \
-        --glob 'Windows/Fonts/*.ttc' \
-        --glob 'Windows/System32/Licenses/neutral/*/*/license.rtf'; then
-
-        echo ":: Installing extracted font files to $FONT_DIR..."
-        local font_src="$EXTRACT_CACHE/Windows/Fonts"
-        local copied=0
-
-        shopt -s nullglob
-        local extracted_fonts=("$font_src"/*.[tT][tT][fc])
-        shopt -u nullglob
-
-        for font_file in "${extracted_fonts[@]}"; do
-            local base_name="${font_file##*/}"
-            install -Dm644 "$font_file" "$FONT_DIR/$base_name"
-            ((copied++))
-        done
-
-        # Install license file if found
-        shopt -s nullglob
-        local license_matches=("$EXTRACT_CACHE"/Windows/System32/Licenses/neutral/*/*/license.rtf)
-        shopt -u nullglob
-        if (( ${#license_matches[@]} > 0 )); then
-            install -Dm644 "${license_matches[0]}" "/usr/share/licenses/ttf-ms-fonts/license.rtf"
-        fi
-
-        # Cleanup cache
-        rm -rf "$EXTRACT_CACHE"
-
-        echo ":: Updating font cache (fc-cache)..."
-        fc-cache -f "$FONT_DIR" >/dev/null 2>&1 || true
-
-        echo ":: [ttf-ms-fonts] Successfully installed $copied Microsoft TrueType fonts."
-    else
-        echo "==> ERROR: Font extraction failed." >&2
-        echo "==> Ensure python, wimlib, and internet connection to Microsoft are functioning." >&2
-    fi
+    echo ""
+    echo "================================================================================"
+    echo "  Microsoft Windows 11 Fonts Package Installed"
+    echo "================================================================================"
+    echo "  To download and extract the official TrueType fonts directly from Microsoft,"
+    echo "  please run the following command in your terminal:"
+    echo ""
+    echo "      sudo ttf-ms-fonts-setup"
+    echo ""
+    echo "  This downloads only the font chunks (~200 MB) via remote HTTP Range requests"
+    echo "  and installs them cleanly into $FONT_DIR."
+    echo "================================================================================"
+    echo ""
 }
 
 post_upgrade() {

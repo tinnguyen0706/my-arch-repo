@@ -1,0 +1,89 @@
+#!/bin/bash
+set -euo pipefail
+
+# Helper to download and extract official Microsoft Windows 11 TrueType fonts
+# Uses remote HTTP Range requests to stream font data directly from Microsoft's ISO
+
+FONT_DIR="/usr/share/fonts/TTF"
+SCRIPTS_DIR="/usr/share/ttf-ms-fonts"
+EXTRACT_CACHE="/var/cache/ttf-ms-fonts"
+
+# Microsoft Evaluation Center permanent fwlink for 64-bit Windows 11 Enterprise ISO
+MS_FWLINK_PRIMARY="https://go.microsoft.com/fwlink/?linkid=2382600"
+MS_FWLINK_FALLBACK="https://aka.ms/Win11E-ISO-25H2-en-us"
+
+if [[ $EUID -ne 0 ]]; then
+    echo "==> ERROR: This script must be run as root (e.g. sudo ttf-ms-fonts-setup)" >&2
+    exit 1
+fi
+
+resolve_iso_url() {
+    local target="$1"
+    local resolved=""
+    resolved=$(curl -sIL -o /dev/null -w "%{url_effective}" --connect-timeout 15 --retry 2 "$target" 2>/dev/null || true)
+    if [[ "$resolved" =~ \.iso$ ]]; then
+        echo "$resolved"
+        return 0
+    fi
+    return 1
+}
+
+echo ":: [ttf-ms-fonts] Resolving latest official Microsoft Windows 11 ISO..."
+iso_url=$(resolve_iso_url "$MS_FWLINK_PRIMARY" || true)
+
+if [[ -z "$iso_url" ]]; then
+    echo ":: Primary link busy, attempting fallback redirect..."
+    iso_url=$(resolve_iso_url "$MS_FWLINK_FALLBACK" || true)
+fi
+
+# Final static fallback if fwlinks are temporarily unreachable
+if [[ -z "$iso_url" ]]; then
+    iso_url="https://software-static.download.prss.microsoft.com/dbazure/26300.9457.260913-1737.26h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
+fi
+
+iso_name="${iso_url##*/}"
+echo ":: Connected to upstream ISO: $iso_name"
+echo ":: Using HTTP Range streaming to extract fonts (downloading only font chunks)..."
+
+mkdir -p "$FONT_DIR" "$EXTRACT_CACHE"
+
+if python3 "$SCRIPTS_DIR/remote_wim.py" --url "$iso_url" extract \
+    --output-dir "$EXTRACT_CACHE" \
+    --glob 'Windows/Fonts/*.ttf' \
+    --glob 'Windows/Fonts/*.ttc' \
+    --glob 'Windows/System32/Licenses/neutral/*/*/license.rtf'; then
+
+    echo ":: Installing extracted font files to $FONT_DIR..."
+    font_src="$EXTRACT_CACHE/Windows/Fonts"
+    copied=0
+
+    shopt -s nullglob
+    extracted_fonts=("$font_src"/*.[tT][tT][fc])
+    shopt -u nullglob
+
+    for font_file in "${extracted_fonts[@]}"; do
+        base_name="${font_file##*/}"
+        install -Dm644 "$font_file" "$FONT_DIR/$base_name"
+        ((copied++))
+    done
+
+    # Install license file if found
+    shopt -s nullglob
+    license_matches=("$EXTRACT_CACHE"/Windows/System32/Licenses/neutral/*/*/license.rtf)
+    shopt -u nullglob
+    if (( ${#license_matches[@]} > 0 )); then
+        install -Dm644 "${license_matches[0]}" "/usr/share/licenses/ttf-ms-fonts/license.rtf"
+    fi
+
+    # Cleanup cache
+    rm -rf "$EXTRACT_CACHE"
+
+    echo ":: Updating system font cache (fc-cache)..."
+    fc-cache -f "$FONT_DIR" >/dev/null 2>&1 || true
+
+    echo ":: [ttf-ms-fonts] Successfully installed $copied Microsoft TrueType fonts into $FONT_DIR."
+else
+    echo "==> ERROR: Font extraction failed." >&2
+    echo "==> Please check your network connection and retry." >&2
+    exit 1
+fi

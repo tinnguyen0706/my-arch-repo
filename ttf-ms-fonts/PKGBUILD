@@ -1,26 +1,31 @@
 pkgname=ttf-ms-fonts
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Microsoft Windows 11 TrueType fonts (HTTP range installer package)"
 arch=('any')
 url="https://www.microsoft.com/typography/fonts/"
 license=('custom')
-depends=('python' 'wimlib' 'fontconfig')
+depends=('python' 'wimlib' 'fontconfig' 'curl')
 provides=('ttf-font' 'ttf-ms-win11' 'ttf-tahoma' 'emoji-font')
 conflicts=('ttf-ms-win11' 'ttf-ms-win11-auto' 'ttf-ms-win11-base' 'ttf-tahoma' 'ttf-vista-fonts')
 install="${pkgname}.install"
 source=(
+  ttf-ms-fonts-setup
   remote_udf.py
   remote_wim_core.py
   remote_wim.py
 )
 sha256sums=(
+  'd9d20c2d81ff509d027b428e7c8a33d0f2d4dcfdaf2489f97668c9ef39aa89f3'
   'a7d1ead251bf9f527c9e8127dedd044151a1bbdb1cbe28f01842985805744833'
   '15c2b5cdd0f424704fd7cf056cc86a3a677f23f104f12fa329515c6604ea27b8'
   'd48f4d6563201d1acb8beca17a108248f6d3292da26233617cdcd07785c31200'
 )
 
 package() {
+  install -dm755 "$pkgdir/usr/bin"
+  install -m755 "$srcdir/ttf-ms-fonts-setup" "$pkgdir/usr/bin/ttf-ms-fonts-setup"
+
   install -dm755 "$pkgdir/usr/share/$pkgname"
   install -m644 "$srcdir/remote_udf.py" "$pkgdir/usr/share/$pkgname/"
   install -m644 "$srcdir/remote_wim_core.py" "$pkgdir/usr/share/$pkgname/"
@@ -37,7 +42,7 @@ use requirements before installing or redistributing these fonts.
 
 This package acts as an installer that retrieves Windows 11 fonts
 directly from Microsoft's official evaluation ISO using HTTP range requests
-during post-installation on the user's system and does not redistribute
+via the 'ttf-ms-fonts-setup' command and does not redistribute
 proprietary font binaries within the package repository.
 EOF
 
@@ -45,9 +50,9 @@ EOF
   cat << 'EOF' > "$pkgdir/usr/share/doc/$pkgname/README"
 Microsoft Windows 11 Fonts Installer
 
-This package automatically extracts official Microsoft Windows 11
-TrueType fonts (Arial, Times New Roman, Calibri, Segoe UI, Tahoma, Consolas,
-Cambria, Bahnschrift, etc.) directly from Microsoft's Enterprise Evaluation ISO
-using HTTP range requests upon installation.
+This package provides 'ttf-ms-fonts-setup', a utility that extracts
+official Microsoft Windows 11 TrueType fonts (Arial, Times New Roman, Calibri,
+Segoe UI, Tahoma, Consolas, Cambria, Bahnschrift, etc.) directly from
+Microsoft's Enterprise Evaluation ISO using HTTP range requests.
 EOF
 }
