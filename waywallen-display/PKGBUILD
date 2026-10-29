@@ -10,7 +10,7 @@ license=(MIT)
 provides=('waywallen-display')
 conflicts=('waywallen-display-git')
 depends=(libgcc libstdc++ glibc)
-makedepends=(cmake vulkan-headers vulkan-icd-loader libglvnd qt6-base qt6-declarative cargo glslang)
+makedepends=(git cmake vulkan-headers vulkan-icd-loader libglvnd qt6-base qt6-declarative cargo glslang)
 optdepends=(
     'libglvnd: EGL backend'
     'vulkan-icd-loader: Vulkan backend'
@@ -18,22 +18,22 @@ optdepends=(
     'qt6-declarative: The qml plugin'
 )
 options=(!lto)
-source=("$pkgname-$pkgver.tar.gz::https://github.com/waywallen/waywallen-display/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('a8581e7d0c9b3410a5c9bdc195c0c9850f9c6e6744ac9715b525905112378d10')
+source=("git+https://github.com/waywallen/waywallen-display.git#tag=v$pkgver")
+sha256sums=('SKIP')
 
 prepare() {
-    cd "$pkgname-$pkgver"
+    cd "$pkgname"
     export RUSTUP_TOOLCHAIN=stable
     cargo fetch --locked --target host-tuple
 }
 
 build() {
-    cmake -B build -S "$pkgname-$pkgver" \
+    cmake -B build -S "$pkgname" \
         -DCMAKE_BUILD_TYPE=None \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DWAYWALLEN_DISPLAY_PLUGIN_QML=ON
     cmake --build build
-    cd "$pkgname-$pkgver"
+    cd "$pkgname"
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
     if check_option lto y; then
@@ -50,8 +50,8 @@ build() {
 
 package() {
     DESTDIR="$pkgdir" cmake --install build
-    find "$pkgname-$pkgver/target/$CARCH-unknown-linux-gnu/release" -type f -executable -maxdepth 1 \
+    find "$pkgname/target/$CARCH-unknown-linux-gnu/release" -type f -executable -maxdepth 1 \
         -printf "Installing %p...\n" \
         -exec install -Dm0755 -t "$pkgdir/usr/bin" {} +
-    install -Dm0644 "$pkgname-$pkgver/LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
+    install -Dm0644 "$pkgname/LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
 }

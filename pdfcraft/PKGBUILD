@@ -11,11 +11,11 @@ provides=('pdfcraft' 'printcraft')
 conflicts=('pdfcraft-bin' 'pdfcraft-git' 'printcraft' 'printcraft-git')
 replaces=('printcraft')
 source=("git+https://github.com/storytold/pdfcraft.git#tag=v$pkgver"
-        "text-detection.rten::https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten"
-        "text-recognition.rten::https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten")
+        "text-detection.onnx::https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.onnx"
+        "text-recognition.onnx::https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.onnx")
 sha256sums=('SKIP'
-            'f15cfb56bd02c4bf478a20343986504a1f01e1665c2b3a0ad66340f054b1b5ca'
-            'e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e')
+            'a917b23dbd9524b465df7e922641b3ff2981623df4ded5a0234004ef2fee7cfe'
+            '86c145c2edb96c8caed5b1ebb8f44d706408922211451c309c625157dd6061c5')
 
 build() {
   cd "$pkgname"
@@ -59,6 +59,6 @@ package() {
   done
 
   # Install pre-trained OCR models (Scan & OCR text recognition)
-  install -Dm644 "$srcdir/text-detection.rten" "$pkgdir/usr/share/$pkgname/models/text-detection.rten"
-  install -Dm644 "$srcdir/text-recognition.rten" "$pkgdir/usr/share/$pkgname/models/text-recognition.rten"
+  install -Dm644 "$srcdir/text-detection.onnx" "$pkgdir/usr/share/$pkgname/models/text-detection.onnx"
+  install -Dm644 "$srcdir/text-recognition.onnx" "$pkgdir/usr/share/$pkgname/models/text-recognition.onnx"
 }
