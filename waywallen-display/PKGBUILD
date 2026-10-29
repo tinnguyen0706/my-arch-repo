@@ -1,7 +1,7 @@
 # Maintainer: ZhangHua <admin@waywallen.io>
 
 pkgname=waywallen-display
-pkgver=0.4.3
+pkgver=0.4.4
 pkgrel=1
 pkgdesc="Desktop integration for waywallen"
 arch=(x86_64)

@@ -1,5 +1,5 @@
 pkgname=pdfcraft
-pkgver=0.14.0
+pkgver=0.15.0
 pkgrel=1
 pkgdesc="An open-source PDF reader and editor written from scratch in pure Rust"
 arch=('x86_64')
