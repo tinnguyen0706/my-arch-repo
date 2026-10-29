@@ -1,6 +1,6 @@
 pkgname=zalo
 pkgver=26.10.20
-_commithash=267fda9
+_commithash=12ef36d
 pkgrel=1
 pkgdesc="Zalo for Linux — Official Original Version (without ZaDark)"
 arch=('x86_64')
