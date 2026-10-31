@@ -29,8 +29,20 @@ echo "export RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /etc/profile.d/cargo-host.sh
 echo "RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /etc/environment
 echo "export RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /home/builder/.bashrc
 
-# C/C++ packages like howdy-next: if compiling for v4 on runner without AVX-512,
-# install qemu-user so any intermediate host code generator (e.g. howdy_config_generator) can run transparently
+# C/C++ packages like howdy-next: intercept host generators to prevent SIGILL under v4
 if [[ "$TARGET_ARCH" == "v4" ]]; then
-  pacman -S --noconfirm --needed qemu-user-x86 2>/dev/null || true
+  CXX_WRAPPER="$GITHUB_WORKSPACE/.github/scripts/cxx-wrapper.sh"
+  chmod +x "$CXX_WRAPPER"
+  WRAPPER_DIR="/usr/local/compiler-wrappers"
+  mkdir -p "$WRAPPER_DIR"
+  for comp in gcc g++ cc c++ clang clang++; do
+    cat << WRAP_EOF > "$WRAPPER_DIR/$comp"
+#!/usr/bin/env bash
+exec "$CXX_WRAPPER" "/usr/bin/$comp" "\$@"
+WRAP_EOF
+    chmod +x "$WRAPPER_DIR/$comp"
+  done
+  echo "export PATH=\"$WRAPPER_DIR:\$PATH\"" >> /etc/profile.d/compiler-wrappers.sh
+  echo "PATH=\"$WRAPPER_DIR:\$PATH\"" >> /etc/environment
+  sed -i "1i export PATH=\"$WRAPPER_DIR:\$PATH\"" /home/builder/.bashrc
 fi
