@@ -6,13 +6,19 @@ RUSTC="$1"
 shift
 
 is_host_artifact=0
-for arg in "$@"; do
-  case "$arg" in
-    --crate-name=build_script_*|build_script_*|build-script-*)
+for ((i=1; i<=$#; i++)); do
+  arg="${!i}"
+  if [[ "$arg" == "--crate-name" ]]; then
+    next_idx=$((i + 1))
+    next_arg="${!next_idx:-}"
+    if [[ "$next_arg" == "build_script_"* || "$next_arg" == *"build_script"* ]]; then
       is_host_artifact=1
       break
-      ;;
-  esac
+    fi
+  elif [[ "$arg" == --crate-name=build_script_* || "$arg" == *"/build.rs" || "$arg" == "build.rs" ]]; then
+    is_host_artifact=1
+    break
+  fi
 done
 
 # Check if compiling a procedural macro
