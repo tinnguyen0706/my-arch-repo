@@ -3,13 +3,15 @@
 xdg-desktop-portal-umbriel-git
 umbriel-git
 open-wallpaper-engine
+howdy-next
+waywallen
+wordcraft
+gridcraft
+deckcraft
+pdfcraft
 
 #####
-# Storytold Craft Apps (Compiled for x86-64-v3 & v4; office-craft meta package is generic 'any')
-local:wordcraft
-local:gridcraft
-local:deckcraft
-local:pdfcraft
+# Meta packages (Generic 'any')
 local:office-craft
 
 #####
@@ -19,5 +21,4 @@ local:zalo
 local:fcitx5-lotus
 local:tex-fmt
 local:waywallen-display
-local:waywallen
 local:ttf-ms-fonts
