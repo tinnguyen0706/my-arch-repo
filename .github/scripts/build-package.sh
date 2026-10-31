@@ -76,7 +76,11 @@ else
       ASSUME_ARGS="$ASSUME_ARGS --assume-installed $subpkg"
     done
     PARU_FLAGS="--noconfirm --skipreview --useask --removemake --nocheck -B$ASSUME_ARGS"
-    if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'"; then
+    WRAPPER_EXPORT=""
+    if [[ -x "$GITHUB_WORKSPACE/.github/scripts/rustc-wrapper.sh" ]]; then
+      WRAPPER_EXPORT="export RUSTC_WRAPPER='$GITHUB_WORKSPACE/.github/scripts/rustc-wrapper.sh'; "
+    fi
+    if ! sudo -u builder bash -lc "${WRAPPER_EXPORT}cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'"; then
       echo "::warning::paru exited non-zero for $PKG; checking produced packages."
     fi
   fi
