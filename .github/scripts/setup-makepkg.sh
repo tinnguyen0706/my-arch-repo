@@ -28,3 +28,9 @@ chmod +x "$WRAPPER_PATH"
 echo "export RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /etc/profile.d/cargo-host.sh
 echo "RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /etc/environment
 echo "export RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /home/builder/.bashrc
+
+# C/C++ packages like howdy-next: if compiling for v4 on runner without AVX-512,
+# install qemu-user so any intermediate host code generator (e.g. howdy_config_generator) can run transparently
+if [[ "$TARGET_ARCH" == "v4" ]]; then
+  pacman -S --noconfirm --needed qemu-user-x86 2>/dev/null || true
+fi

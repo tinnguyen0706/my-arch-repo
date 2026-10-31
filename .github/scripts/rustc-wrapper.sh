@@ -5,36 +5,41 @@
 RUSTC="$1"
 shift
 
+has_explicit_target=0
 is_host_artifact=0
+
 for ((i=1; i<=$#; i++)); do
   arg="${!i}"
-  if [[ "$arg" == "--crate-name" ]]; then
-    next_idx=$((i + 1))
-    next_arg="${!next_idx:-}"
-    if [[ "$next_arg" == "build_script_"* || "$next_arg" == *"build_script"* ]]; then
+  case "$arg" in
+    --target|--target=*)
+      has_explicit_target=1
+      ;;
+    --crate-name)
+      next_idx=$((i + 1))
+      next_arg="${!next_idx:-}"
+      if [[ "$next_arg" == "build_script_"* || "$next_arg" == *"build_script"* || "$next_arg" == "autocfg"* ]]; then
+        is_host_artifact=1
+      fi
+      ;;
+    --crate-name=build_script_*|--crate-name=autocfg*|*"/build.rs"|"build.rs")
       is_host_artifact=1
-      break
-    fi
-  elif [[ "$arg" == --crate-name=build_script_* || "$arg" == *"/build.rs" || "$arg" == "build.rs" ]]; then
-    is_host_artifact=1
-    break
-  fi
+      ;;
+    --crate-type)
+      next_idx=$((i + 1))
+      if [[ "${!next_idx:-}" == *"proc-macro"* ]]; then
+        is_host_artifact=1
+      fi
+      ;;
+    *--crate-type=proc-macro*)
+      is_host_artifact=1
+      ;;
+  esac
 done
 
-# Check if compiling a procedural macro
-for ((i=1; i<=$#; i++)); do
-  if [[ "${!i}" == "--crate-type" ]]; then
-    next_idx=$((i + 1))
-    if [[ "${!next_idx:-}" == *"proc-macro"* ]]; then
-      is_host_artifact=1
-      break
-    fi
-  elif [[ "${!i}" == *"--crate-type=proc-macro"* ]]; then
-    is_host_artifact=1
-    break
-  fi
-done
-
+# Nếu Cargo không truyền --target, toàn bộ artifact đó đang được build cho máy host
+if (( has_explicit_target == 0 )); then
+  is_host_artifact=1
+fi
 if (( is_host_artifact == 1 )); then
   NEW_ARGS=()
   for arg in "$@"; do
