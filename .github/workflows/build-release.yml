@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - '.github/**'
+      - '.github/workflows/sync-aur.yml'
       - 'README.md'
       - 'packages.txt'
   workflow_dispatch: {}
@@ -24,11 +24,11 @@ jobs:
     name: Scan packages
     runs-on: ubuntu-latest
     outputs:
-      has_packages: ${{ steps.set-matrix.outputs.has_packages }}
-      has_wave1: ${{ steps.set-matrix.outputs.has_wave1 }}
-      matrix_wave1: ${{ steps.set-matrix.outputs.matrix_wave1 }}
-      has_wave2: ${{ steps.set-matrix.outputs.has_wave2 }}
-      matrix_wave2: ${{ steps.set-matrix.outputs.matrix_wave2 }}
+      has_packages: ${{ steps.scan.outputs.has_packages }}
+      has_wave1: ${{ steps.scan.outputs.has_wave1 }}
+      has_wave2: ${{ steps.scan.outputs.has_wave2 }}
+      matrix_wave1: ${{ steps.scan.outputs.matrix_wave1 }}
+      matrix_wave2: ${{ steps.scan.outputs.matrix_wave2 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,32 +36,34 @@ jobs:
           fetch-depth: 2
 
       - name: Scan directories and generate tiered matrices
-        id: set-matrix
+        id: scan
         run: |
           set -euo pipefail
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "Scheduled or manual run: scanning all packages."
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger: scanning all package directories..."
             pkgs=()
-            for dir in */ ; do
-              dir="${dir%/}"
-              case "$dir" in
-                .github|cache|output) continue ;;
+            for dir in */; do
+              [ -d "$dir" ] || continue
+              dir_name="${dir%/}"
+              case "$dir_name" in
+                .github|.sync-staging|output) continue ;;
               esac
-              if [[ -f "$dir/PKGBUILD" ]]; then
-                pkgs+=("$dir")
+              if [ -f "$dir_name/PKGBUILD" ]; then
+                pkgs+=("$dir_name")
               fi
             done
           else
-            echo "Push or merged PR event: detecting changed packages."
-            mapfile -t CHANGED < <(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $1}' | sort -u)
+            echo "Push trigger: scanning changed package directories..."
+            mapfile -t changed_dirs < <(git diff --name-only HEAD~1 HEAD | awk -F'/' 'NF > 1 {print $1}' | sort -u)
             pkgs=()
-            for dir in "${CHANGED[@]}"; do
-              case "$dir" in
-                .github|cache|output|"") continue ;;
+            for d in "${changed_dirs[@]}"; do
+              [ -z "$d" ] && continue
+              case "$d" in
+                .github|.sync-staging|output) continue ;;
               esac
-              if [[ -f "$dir/PKGBUILD" ]]; then
-                pkgs+=("$dir")
+              if [ -f "$d/PKGBUILD" ]; then
+                pkgs+=("$d")
               fi
             done
           fi
@@ -91,46 +93,9 @@ jobs:
             esac
           done
 
-          build_matrix() {
-            python3 - "$@" << 'PYEOF'
-          import json, sys
-          from pathlib import Path
-
-          pkgs = sys.argv[1:]
-          matrix = []
-          for pkg in pkgs:
-              p = Path(pkg) / 'PKGBUILD'
-              content = p.read_text() if p.exists() else ''
-              is_any = any(line.strip().startswith(('arch=(\'any\')', 'arch=(any)')) for line in content.splitlines())
-              has_compile = any(tool in content for tool in ['cargo build', 'cmake', 'meson', 'make '])
-              is_generic = is_any or not has_compile
-
-              matrix.append({
-                  'package': pkg,
-                  'target': {
-                      'arch': 'generic' if is_generic else 'v3',
-                      'profile': 'docker-makepkg-v3',
-                      'pkgcarch': 'any' if is_any else ('x86_64' if is_generic else 'x86_64_v3'),
-                      'db': 'tinhiem'
-                  }
-              })
-              if not is_generic:
-                  matrix.append({
-                      'package': pkg,
-                      'target': {
-                          'arch': 'v4',
-                          'profile': 'docker-makepkg-v4',
-                          'pkgcarch': 'x86_64_v4',
-                          'db': 'tinhiem-v4'
-                      }
-                  })
-          print(json.dumps(matrix))
-          PYEOF
-          }
-
           if (( ${#wave1[@]} > 0 )); then
             echo "has_wave1=true" >> "$GITHUB_OUTPUT"
-            echo "matrix_wave1=$(build_matrix "${wave1[@]}")" >> "$GITHUB_OUTPUT"
+            echo "matrix_wave1=$(python3 .github/scripts/generate-matrix.py "${wave1[@]}")" >> "$GITHUB_OUTPUT"
           else
             echo "has_wave1=false" >> "$GITHUB_OUTPUT"
             echo "matrix_wave1=[]" >> "$GITHUB_OUTPUT"
@@ -138,7 +103,7 @@ jobs:
 
           if (( ${#wave2[@]} > 0 )); then
             echo "has_wave2=true" >> "$GITHUB_OUTPUT"
-            echo "matrix_wave2=$(build_matrix "${wave2[@]}")" >> "$GITHUB_OUTPUT"
+            echo "matrix_wave2=$(python3 .github/scripts/generate-matrix.py "${wave2[@]}")" >> "$GITHUB_OUTPUT"
           else
             echo "has_wave2=false" >> "$GITHUB_OUTPUT"
             echo "matrix_wave2=[]" >> "$GITHUB_OUTPUT"
@@ -156,47 +121,19 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix_wave1) }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Install base dependencies
-        run: |
-          set -euo pipefail
-          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
-          if ! grep -q '\[chaotic-aur\]' /etc/pacman.conf; then
-          {
-            echo ""
-            echo "[chaotic-aur]"
-            echo "SigLevel = Optional TrustAll"
-            echo "Server = https://geo-mirror.chaotic.cx/chaotic-aur/x86_64"
-            echo "Server = https://builds.garudalinux.org/repos/chaotic-aur/x86_64"
-            echo "Server = https://cdn-mirror.chaotic.cx/chaotic-aur/x86_64"
-          } >> /etc/pacman.conf
-          fi
-          pacman -Syu --noconfirm --needed git subversion mercurial sudo rsync github-cli fakeroot binutils pacman-contrib paru curl awk tar jq rustup cmake clang perl python-build python-installer python-wheel python-setuptools lito
-          id builder >/dev/null 2>&1 || useradd -m builder
-          grep -q '^builder ALL=(ALL) NOPASSWD: ALL$' /etc/sudoers || echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-          rustup default stable
-          sudo -u builder rustup default stable
+        run: .github/scripts/install-build-deps.sh
 
       - name: Configure makepkg for ${{ matrix.target.arch }}
-        run: |
-          set -euo pipefail
-          echo "Downloading CachyOS ${{ matrix.target.arch }} makepkg.conf..."
-          curl -sLo /etc/makepkg.conf "https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/${{ matrix.target.profile }}/makepkg.conf"
-          echo "Downloading CachyOS ${{ matrix.target.arch }} rust.conf..."
-          mkdir -p /etc/makepkg.conf.d
-          curl -sLo /etc/makepkg.conf.d/rust.conf "https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/${{ matrix.target.profile }}/rust.conf"
-          sed -i 's/^PKGDEST=/#PKGDEST=/g' /etc/makepkg.conf
-          sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
-          sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
-          echo 'PACKAGECARCH="${{ matrix.target.pkgcarch }}"' >> /etc/makepkg.conf
-          mkdir -p /etc/profile.d
-          echo 'export CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/profile.d/cargo-host.sh
-          echo 'export CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/profile.d/cargo-host.sh
-          echo 'CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/environment
-          echo 'CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/environment
+        run: .github/scripts/setup-makepkg.sh "${{ matrix.target.arch }}" "${{ matrix.target.profile }}" "${{ matrix.target.pkgcarch }}"
 
       - name: Configure pacman options and existing repository
         env:
-          GH_TOKEN: ${{ github.token }}
           DB_NAME: ${{ matrix.target.db }}
         run: |
           set -euo pipefail
@@ -210,142 +147,13 @@ jobs:
           fi
           pacman -Sy
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
       - name: Fix workspace ownership for build user
         run: chown -R builder:builder "$GITHUB_WORKSPACE"
 
       - name: Build, Cache and Fallback Logic
         env:
           GH_TOKEN: ${{ github.token }}
-          PKG: ${{ matrix.package }}
-          DB_NAME: ${{ matrix.target.db }}
-          TARGET_ARCH: ${{ matrix.target.arch }}
-        run: |
-          set -uo pipefail
-          mkdir -p output /tmp/repo-files /tmp/repo-db
-
-          echo "Fetching database metadata for $DB_NAME from VPS..."
-          if curl -sSLf "https://arch.tinhiem.id.vn/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
-            if ! tar -xzf "/tmp/repo-db/${DB_NAME}.files.tar.gz" -C /tmp/repo-files; then
-              echo "::warning::Cannot extract ${DB_NAME}.files.tar.gz; treating as rebuild."
-            fi
-          else
-            echo "::warning::No ${DB_NAME}.files.tar.gz on VPS; treating as rebuild."
-          fi
-
-          echo "Checking status for $PKG ($TARGET_ARCH)"
-          VCS_PREPASS_OK=true
-          if grep -q 'pkgver()' "$PKG/PKGBUILD"; then
-            if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -od --noprepare --skipinteg"; then
-              echo "::warning::pkgver() pre-pass failed for $PKG; forcing rebuild."
-              VCS_PREPASS_OK=false
-            fi
-          fi
-
-          EXPECTED_PKGS=""
-          if ! EXPECTED_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg --packagelist"); then
-            echo "::warning::makepkg --packagelist failed for $PKG; forcing rebuild."
-            EXPECTED_PKGS=""
-          fi
-          EXPECTED_PKGS="${EXPECTED_PKGS//:/.}"
-
-          NEEDS_BUILD=false
-          if [[ "$VCS_PREPASS_OK" != "true" || -z "$EXPECTED_PKGS" ]]; then
-            NEEDS_BUILD=true
-          else
-            for pkg_path in $EXPECTED_PKGS; do
-              pkg_basename=$(basename "$pkg_path")
-              if ! grep -q -x "$pkg_basename" /tmp/repo-files/*/desc 2>/dev/null; then
-                NEEDS_BUILD=true
-                break
-              fi
-            done
-          fi
-
-          if [[ "$NEEDS_BUILD" == "false" ]]; then
-            echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
-            for pkg_path in $EXPECTED_PKGS; do
-              pkg_basename=$(basename "$pkg_path")
-              if ! curl -sSLf "https://arch.tinhiem.id.vn/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
-                echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
-                NEEDS_BUILD=true
-                break
-              fi
-            done
-          fi
-
-          if [[ "$NEEDS_BUILD" == "false" ]]; then
-            echo "$PKG ($TARGET_ARCH)" > "output/status-skipped-${PKG}-${TARGET_ARCH}.txt"
-          else
-            echo "Updating checksums for $PKG..."
-            if [[ "$PKG" == "office-craft" ]]; then
-              echo "Building meta-package $PKG with makepkg -d..."
-              sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -d --noconfirm"
-            else
-              ASSUME_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && source PKGBUILD && echo \${pkgname[@]}")
-              ASSUME_ARGS=""
-              for subpkg in $ASSUME_PKGS; do
-                ASSUME_ARGS="$ASSUME_ARGS --assume-installed $subpkg"
-              done
-              PARU_FLAGS="--noconfirm --skipreview --useask --removemake --nocheck -B$ASSUME_ARGS"
-              if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'"; then
-                echo "::warning::paru exited non-zero for $PKG; checking produced packages."
-              fi
-            fi
-
-            if ls "$PKG"/*.pkg.tar.zst >/dev/null 2>&1; then
-              mv "$PKG"/*.pkg.tar.zst output/
-              echo "Build OK: $PKG ($TARGET_ARCH)"
-              echo "$PKG ($TARGET_ARCH)" > "output/status-built-${PKG}-${TARGET_ARCH}.txt"
-            else
-              echo "Build failed for $PKG ($TARGET_ARCH). Triggering fallback."
-              FALLBACK_CANDIDATES=()
-              declare -A candidate_seen=()
-              add_candidate() {
-                [[ -n "$1" ]] || return 0
-                [[ -n "${candidate_seen[$1]:-}" ]] && return 0
-                candidate_seen["$1"]=1
-                FALLBACK_CANDIDATES+=("$1")
-              }
-              if [[ -d /tmp/repo-files ]]; then
-                for desc_file in /tmp/repo-files/*/desc; do
-                  [[ -f "$desc_file" ]] || continue
-                  base_pkg=$(awk '/^%BASE%/{getline; print; exit}' "$desc_file")
-                  pkg_name=$(awk '/^%NAME%/{getline; print; exit}' "$desc_file")
-                  check_name="${base_pkg:-$pkg_name}"
-                  [[ "$check_name" == "$PKG" ]] || continue
-                  add_candidate "$(awk '/^%FILENAME%/{getline; print; exit}' "$desc_file")"
-                done
-              fi
-              RESTORED_COUNT=0
-              for file_name in "${FALLBACK_CANDIDATES[@]}"; do
-                if curl -sSLf "https://arch.tinhiem.id.vn/$file_name" -o "output/$file_name" 2>/dev/null; then
-                  RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
-                fi
-              done
-              if (( RESTORED_COUNT > 0 )); then
-                echo "Restored previous build for $PKG ($TARGET_ARCH)"
-                echo "$PKG ($TARGET_ARCH) — (fallback: $(basename "${FALLBACK_CANDIDATES[0]}"))" > "output/status-restored-${PKG}-${TARGET_ARCH}.txt"
-              else
-                echo "Fallback failed: no previous file for $PKG ($TARGET_ARCH)"
-                echo "$PKG ($TARGET_ARCH)" > "output/status-failed-${PKG}-${TARGET_ARCH}.txt"
-              fi
-            fi
-          fi
-
-          for f in output/*:* ; do
-            if [[ -f "$f" ]]; then
-              new_f="${f//:/.}"
-              echo "Renaming $f to $new_f"
-              mv "$f" "$new_f"
-            fi
-          done
-
-          sudo -u builder rm -rf "$GITHUB_WORKSPACE/$PKG/src" "$GITHUB_WORKSPACE/$PKG/pkg"
+        run: .github/scripts/build-package.sh "${{ matrix.package }}" "${{ matrix.target.db }}" "${{ matrix.target.arch }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -367,47 +175,19 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix_wave2) }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Install base dependencies
-        run: |
-          set -euo pipefail
-          sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
-          if ! grep -q '\[chaotic-aur\]' /etc/pacman.conf; then
-          {
-            echo ""
-            echo "[chaotic-aur]"
-            echo "SigLevel = Optional TrustAll"
-            echo "Server = https://geo-mirror.chaotic.cx/chaotic-aur/x86_64"
-            echo "Server = https://builds.garudalinux.org/repos/chaotic-aur/x86_64"
-            echo "Server = https://cdn-mirror.chaotic.cx/chaotic-aur/x86_64"
-          } >> /etc/pacman.conf
-          fi
-          pacman -Syu --noconfirm --needed git subversion mercurial sudo rsync github-cli fakeroot binutils pacman-contrib paru curl awk tar jq rustup cmake clang perl python-build python-installer python-wheel python-setuptools lito
-          id builder >/dev/null 2>&1 || useradd -m builder
-          grep -q '^builder ALL=(ALL) NOPASSWD: ALL$' /etc/sudoers || echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-          rustup default stable
-          sudo -u builder rustup default stable
+        run: .github/scripts/install-build-deps.sh
 
       - name: Configure makepkg for ${{ matrix.target.arch }}
-        run: |
-          set -euo pipefail
-          echo "Downloading CachyOS ${{ matrix.target.arch }} makepkg.conf..."
-          curl -sLo /etc/makepkg.conf "https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/${{ matrix.target.profile }}/makepkg.conf"
-          echo "Downloading CachyOS ${{ matrix.target.arch }} rust.conf..."
-          mkdir -p /etc/makepkg.conf.d
-          curl -sLo /etc/makepkg.conf.d/rust.conf "https://raw.githubusercontent.com/CachyOS/docker-makepkg/refs/heads/master/${{ matrix.target.profile }}/rust.conf"
-          sed -i 's/^PKGDEST=/#PKGDEST=/g' /etc/makepkg.conf
-          sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
-          sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
-          echo 'PACKAGECARCH="${{ matrix.target.pkgcarch }}"' >> /etc/makepkg.conf
-          mkdir -p /etc/profile.d
-          echo 'export CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/profile.d/cargo-host.sh
-          echo 'export CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/profile.d/cargo-host.sh
-          echo 'CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/environment
-          echo 'CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/environment
+        run: .github/scripts/setup-makepkg.sh "${{ matrix.target.arch }}" "${{ matrix.target.profile }}" "${{ matrix.target.pkgcarch }}"
 
       - name: Configure pacman options and existing repository
         env:
-          GH_TOKEN: ${{ github.token }}
           DB_NAME: ${{ matrix.target.db }}
         run: |
           set -euo pipefail
@@ -420,11 +200,6 @@ jobs:
           } >> /etc/pacman.conf
           fi
           pacman -Sy
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
       - name: Fix workspace ownership for build user
         run: chown -R builder:builder "$GITHUB_WORKSPACE"
@@ -450,131 +225,7 @@ jobs:
       - name: Build, Cache and Fallback Logic
         env:
           GH_TOKEN: ${{ github.token }}
-          PKG: ${{ matrix.package }}
-          DB_NAME: ${{ matrix.target.db }}
-          TARGET_ARCH: ${{ matrix.target.arch }}
-        run: |
-          set -uo pipefail
-          mkdir -p output /tmp/repo-files /tmp/repo-db
-
-          echo "Fetching database metadata for $DB_NAME from VPS..."
-          if curl -sSLf "https://arch.tinhiem.id.vn/${DB_NAME}.files.tar.gz" -o "/tmp/repo-db/${DB_NAME}.files.tar.gz" 2>/dev/null; then
-            if ! tar -xzf "/tmp/repo-db/${DB_NAME}.files.tar.gz" -C /tmp/repo-files; then
-              echo "::warning::Cannot extract ${DB_NAME}.files.tar.gz; treating as rebuild."
-            fi
-          else
-            echo "::warning::No ${DB_NAME}.files.tar.gz on VPS; treating as rebuild."
-          fi
-
-          echo "Checking status for $PKG ($TARGET_ARCH)"
-          VCS_PREPASS_OK=true
-          if grep -q 'pkgver()' "$PKG/PKGBUILD"; then
-            if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -od --noprepare --skipinteg"; then
-              echo "::warning::pkgver() pre-pass failed for $PKG; forcing rebuild."
-              VCS_PREPASS_OK=false
-            fi
-          fi
-
-          EXPECTED_PKGS=""
-          if ! EXPECTED_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg --packagelist"); then
-            echo "::warning::makepkg --packagelist failed for $PKG; forcing rebuild."
-            EXPECTED_PKGS=""
-          fi
-          EXPECTED_PKGS="${EXPECTED_PKGS//:/.}"
-
-          NEEDS_BUILD=false
-          if [[ "$VCS_PREPASS_OK" != "true" || -z "$EXPECTED_PKGS" ]]; then
-            NEEDS_BUILD=true
-          else
-            for pkg_path in $EXPECTED_PKGS; do
-              pkg_basename=$(basename "$pkg_path")
-              if ! grep -q -x "$pkg_basename" /tmp/repo-files/*/desc 2>/dev/null; then
-                NEEDS_BUILD=true
-                break
-              fi
-            done
-          fi
-
-          if [[ "$NEEDS_BUILD" == "false" ]]; then
-            echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
-            for pkg_path in $EXPECTED_PKGS; do
-              pkg_basename=$(basename "$pkg_path")
-              if ! curl -sSLf "https://arch.tinhiem.id.vn/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
-                echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
-                NEEDS_BUILD=true
-                break
-              fi
-            done
-          fi
-
-          if [[ "$NEEDS_BUILD" == "false" ]]; then
-            echo "$PKG ($TARGET_ARCH)" > "output/status-skipped-${PKG}-${TARGET_ARCH}.txt"
-          else
-            echo "Updating checksums for $PKG..."
-            if [[ "$PKG" == "office-craft" ]]; then
-              echo "Building meta-package $PKG with makepkg -d..."
-              sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -d --noconfirm"
-            else
-              ASSUME_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && source PKGBUILD && echo \${pkgname[@]}")
-              ASSUME_ARGS=""
-              for subpkg in $ASSUME_PKGS; do
-                ASSUME_ARGS="$ASSUME_ARGS --assume-installed $subpkg"
-              done
-              PARU_FLAGS="--noconfirm --skipreview --useask --removemake --nocheck -B$ASSUME_ARGS"
-              if ! sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'"; then
-                echo "::warning::paru exited non-zero for $PKG; checking produced packages."
-              fi
-            fi
-
-            if ls "$PKG"/*.pkg.tar.zst >/dev/null 2>&1; then
-              mv "$PKG"/*.pkg.tar.zst output/
-              echo "Build OK: $PKG ($TARGET_ARCH)"
-              echo "$PKG ($TARGET_ARCH)" > "output/status-built-${PKG}-${TARGET_ARCH}.txt"
-            else
-              echo "Build failed for $PKG ($TARGET_ARCH). Triggering fallback."
-              FALLBACK_CANDIDATES=()
-              declare -A candidate_seen=()
-              add_candidate() {
-                [[ -n "$1" ]] || return 0
-                [[ -n "${candidate_seen[$1]:-}" ]] && return 0
-                candidate_seen["$1"]=1
-                FALLBACK_CANDIDATES+=("$1")
-              }
-              if [[ -d /tmp/repo-files ]]; then
-                for desc_file in /tmp/repo-files/*/desc; do
-                  [[ -f "$desc_file" ]] || continue
-                  base_pkg=$(awk '/^%BASE%/{getline; print; exit}' "$desc_file")
-                  pkg_name=$(awk '/^%NAME%/{getline; print; exit}' "$desc_file")
-                  check_name="${base_pkg:-$pkg_name}"
-                  [[ "$check_name" == "$PKG" ]] || continue
-                  add_candidate "$(awk '/^%FILENAME%/{getline; print; exit}' "$desc_file")"
-                done
-              fi
-              RESTORED_COUNT=0
-              for file_name in "${FALLBACK_CANDIDATES[@]}"; do
-                if curl -sSLf "https://arch.tinhiem.id.vn/$file_name" -o "output/$file_name" 2>/dev/null; then
-                  RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
-                fi
-              done
-              if (( RESTORED_COUNT > 0 )); then
-                echo "Restored previous build for $PKG ($TARGET_ARCH)"
-                echo "$PKG ($TARGET_ARCH) — (fallback: $(basename "${FALLBACK_CANDIDATES[0]}"))" > "output/status-restored-${PKG}-${TARGET_ARCH}.txt"
-              else
-                echo "Fallback failed: no previous file for $PKG ($TARGET_ARCH)"
-                echo "$PKG ($TARGET_ARCH)" > "output/status-failed-${PKG}-${TARGET_ARCH}.txt"
-              fi
-            fi
-          fi
-
-          for f in output/*:* ; do
-            if [[ -f "$f" ]]; then
-              new_f="${f//:/.}"
-              echo "Renaming $f to $new_f"
-              mv "$f" "$new_f"
-            fi
-          done
-
-          sudo -u builder rm -rf "$GITHUB_WORKSPACE/$PKG/src" "$GITHUB_WORKSPACE/$PKG/pkg"
+        run: .github/scripts/build-package.sh "${{ matrix.package }}" "${{ matrix.target.db }}" "${{ matrix.target.arch }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -588,12 +239,15 @@ jobs:
     name: Generate Pacman DB & Publish Release
     needs: [prepare, build_wave1, build_wave2]
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.prepare.outputs.has_packages == 'true' }}
-    permissions:
-      contents: write
+    if: ${{ always() && (needs.build_wave1.result == 'success' || needs.build_wave1.result == 'skipped') && (needs.build_wave2.result == 'success' || needs.build_wave2.result == 'skipped') && needs.prepare.outputs.has_packages == 'true' }}
     container:
-      image: ghcr.io/archlinux/archlinux:latest
+      image: cachyos/cachyos-v3
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Install dependencies
         run: |
           sed -i '/^\[options\]/a DisableSandboxNetwork' /etc/pacman.conf
@@ -609,150 +263,11 @@ jobs:
       - name: Generate pacman databases, deploy to VPS and update Release Notes
         env:
           GH_TOKEN: ${{ github.token }}
-          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ env.RELEASE_TAG }}
-          SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          mkdir -p output
-          cd output
-          shopt -s nullglob
-
-          # 1. Cấu hình SSH để kết nối VPS
-          mkdir -p "$HOME/.ssh" /root/.ssh 2>/dev/null || true
-          chmod 700 "$HOME/.ssh" /root/.ssh 2>/dev/null || true
-          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
-          cp "$HOME/.ssh/id_ed25519" /root/.ssh/id_ed25519 2>/dev/null || true
-          chmod 600 "$HOME/.ssh/id_ed25519" /root/.ssh/id_ed25519 2>/dev/null || true
-          ssh-keyscan -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
-
-          SSH_CMD="ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
-
-          # 2. Đồng bộ toàn bộ các file gói đang có trên VPS về runner
-          echo "Syncing all existing packages from VPS via rsync..."
-          rsync -av --ignore-existing -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/*.pkg.tar.zst" ./ || true
-
-          for f in *.pkg.tar.zst; do
-            if [[ ! -s "$f" ]]; then
-              echo "Removing empty/invalid package file $f"
-              rm -f "$f"
-            fi
-          done
-
-          pkgs_all=( *.pkg.tar.zst )
-          if (( ${#pkgs_all[@]} == 0 )); then
-            echo "No packages found. Exiting."
-            exit 0
-          fi
-          # Chỉ nạp phiên bản cao nhất (vercmp) của từng package vào database repo-add
-          # để tránh repo-add bị ghi đè ngược khi gặp file phiên bản cũ hơn
-          python3 - << "PYEOF"
-          import subprocess
-          import functools
-          from pathlib import Path
-          from collections import defaultdict
-
-          def cmp_versions(a, b):
-              out = subprocess.run(['vercmp', a, b], capture_output=True, text=True).stdout.strip()
-              return int(out) if out else 0
-
-          groups = defaultdict(list)
-          for p in Path('.').glob('*.pkg.tar.zst'):
-              stem = p.name[:-len('.pkg.tar.zst')]
-              parts = stem.rsplit('-', 3)
-              if len(parts) == 4:
-                  pkgname, pkgver, pkgrel, arch = parts
-                  groups[(pkgname, arch)].append((f"{pkgver}-{pkgrel}", p.name))
-
-          latest_v3 = []
-          latest_v4 = []
-          for (pkgname, arch), items in groups.items():
-              items.sort(key=functools.cmp_to_key(lambda x, y: cmp_versions(x[0], y[0])), reverse=True)
-              top_pkg = items[0][1]
-              if arch in ('x86_64', 'x86_64_v3', 'any'):
-                  latest_v3.append(top_pkg)
-              if arch in ('x86_64', 'x86_64_v4', 'any'):
-                  latest_v4.append(top_pkg)
-
-          Path('pkgs_v3.txt').write_text('\n'.join(sorted(latest_v3)))
-          Path('pkgs_v4.txt').write_text('\n'.join(sorted(latest_v4)))
-          PYEOF
-
-          mapfile -t pkgs_v3 < pkgs_v3.txt
-          mapfile -t pkgs_v4 < pkgs_v4.txt
-
-          if (( ${#pkgs_v3[@]} > 0 )); then
-            echo "Creating tinhiem (v3) database: ${#pkgs_v3[@]} package(s)"
-            repo-add "tinhiem.db.tar.gz" "${pkgs_v3[@]}"
-          fi
-
-          if (( ${#pkgs_v4[@]} > 0 )); then
-            echo "Creating tinhiem-v4 database: ${#pkgs_v4[@]} package(s)"
-            repo-add "tinhiem-v4.db.tar.gz" "${pkgs_v4[@]}"
-          fi
-          rm -f pkgs_v3.txt pkgs_v4.txt
-          echo "Deploying packages and databases to VPS /var/www/repo..."
-          rsync -av -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
-
-          # 2. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
-          $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
-          from pathlib import Path
-          from collections import defaultdict
-          repo_dir = Path("/var/www/repo")
-          groups = defaultdict(list)
-          for p in repo_dir.glob("*.pkg.tar.zst"):
-              stem = p.name[:-len(".pkg.tar.zst")]
-              parts = stem.rsplit("-", 3)
-              if len(parts) == 4:
-                  pkgname, pkgver, pkgrel, arch = parts
-                  groups[(pkgname, arch)].append(p)
-          for (pkgname, arch), files in groups.items():
-              files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-              for old_file in files[3:]:
-                  old_file.unlink(missing_ok=True)
-          PYEOF'
-
-          # 3. Cập nhật Release Tag trên GitHub (Chỉ lưu Changelog & Notes, KHÔNG lưu file nhị phân)
-          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$REPO" \
-              --title "Arch Package Repository" \
-              --notes "Automated release tag."
-          fi
-
-          status_built=( status-built-*.txt )
-          status_skipped=( status-skipped-*.txt )
-          status_restored=( status-restored-*.txt )
-          status_failed=( status-failed-*.txt )
-
-          BUILT_LOG=""
-          for f in "${status_built[@]}"; do [[ -f "$f" ]] && BUILT_LOG+="- $(cat "$f")"$'\n'; done
-
-          SKIPPED_LOG=""
-          for f in "${status_skipped[@]}"; do [[ -f "$f" ]] && SKIPPED_LOG+="- $(cat "$f")"$'\n'; done
-
-          FAILED_COMBINED_LOG=""
-          for f in "${status_failed[@]}" "${status_restored[@]}"; do
-            [[ -f "$f" ]] && FAILED_COMBINED_LOG+="- $(cat "$f")"$'\n'
-          done
-
-          RELEASE_NOTES=$(cat <<EOF
-          ### 📦 Repository Update Summary
-          **Cập nhật lúc:** $(TZ='Asia/Ho_Chi_Minh' date '+%Y-%m-%d %H:%M (UTC+7)')
-
-          - 🔗 **Changelog / Commit Diff:** https://github.com/${REPO}/commit/${SHA}
-          - 🌐 **Máy chủ tải gói (VPS):** https://arch.tinhiem.id.vn/
-
-          #### ✅ Gói mới biên dịch thành công:
-          ${BUILT_LOG:-None}
-
-          #### ⚡ Gói tận dụng cache (bỏ qua compile):
-          ${SKIPPED_LOG:-None}
-
-          #### ❌ Gói build thất bại:
-          ${FAILED_COMBINED_LOG:-None}
-          EOF
-          )
-          gh release edit "$TAG" --repo "$REPO" --title "Arch Repository Release" --notes "$RELEASE_NOTES"
+          .github/scripts/deploy-vps.sh \
+            "${{ secrets.VPS_SSH_KEY }}" \
+            "${{ secrets.VPS_HOST }}" \
+            "${{ secrets.VPS_USER }}" \
+            "${{ github.repository }}" \
+            "${{ env.RELEASE_TAG }}" \
+            "${{ github.sha }}"
