@@ -29,20 +29,17 @@ echo "export RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /etc/profile.d/cargo-host.sh
 echo "RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /etc/environment
 echo "export RUSTC_WRAPPER=\"$WRAPPER_PATH\"" >> /home/builder/.bashrc
 
-# C/C++ packages like howdy-next: intercept host generators to prevent SIGILL under v4
+# In v4 builds on runners without AVX-512 hardware:
+# Install emulator and build anti-sigill preload library to catch and self-heal SIGILL crashes
 if [[ "$TARGET_ARCH" == "v4" ]]; then
-  CXX_WRAPPER="$GITHUB_WORKSPACE/.github/scripts/cxx-wrapper.sh"
-  chmod +x "$CXX_WRAPPER"
-  WRAPPER_DIR="/usr/local/compiler-wrappers"
-  mkdir -p "$WRAPPER_DIR"
-  for comp in gcc g++ cc c++ clang clang++; do
-    cat << WRAP_EOF > "$WRAPPER_DIR/$comp"
-#!/usr/bin/env bash
-exec "$CXX_WRAPPER" "/usr/bin/$comp" "\$@"
-WRAP_EOF
-    chmod +x "$WRAPPER_DIR/$comp"
-  done
-  echo "export PATH=\"$WRAPPER_DIR:\$PATH\"" >> /etc/profile.d/compiler-wrappers.sh
-  echo "PATH=\"$WRAPPER_DIR:\$PATH\"" >> /etc/environment
-  sed -i "1i export PATH=\"$WRAPPER_DIR:\$PATH\"" /home/builder/.bashrc
+  echo "Setting up AVX-512 emulation safeguards for v4 container..."
+  # Install Intel SDE from chaotic-aur or qemu-user as fallback
+  pacman -S --noconfirm --needed intel-sde 2>/dev/null || pacman -S --noconfirm --needed qemu-user 2>/dev/null || true
+
+  ANTI_SIGILL_SRC="$GITHUB_WORKSPACE/.github/scripts/anti-sigill.c"
+  ANTI_SIGILL_LIB="/usr/local/lib/libanti-sigill.so"
+  mkdir -p /usr/local/lib
+  gcc -shared -fPIC -O2 "$ANTI_SIGILL_SRC" -o "$ANTI_SIGILL_LIB" -ldl
+
+  echo "$ANTI_SIGILL_LIB" >> /etc/ld.so.preload
 fi
