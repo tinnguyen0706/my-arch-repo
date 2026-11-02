@@ -9,6 +9,7 @@ wordcraft
 gridcraft
 deckcraft
 pdfcraft
+mailcraft
 
 #####
 # Meta packages (Generic 'any')
