@@ -1,0 +1,78 @@
+# Maintainer: Toan Ho <toanbku@gmail.com>
+
+pkgname=fmess
+pkgver=0.1.28
+pkgrel=1
+pkgdesc="Unofficial desktop app for Messenger on the web"
+arch=('x86_64')
+url="https://github.com/toanbku/fmess"
+license=('MIT')
+depends=(
+  'cairo'
+  'gdk-pixbuf2'
+  'glib2'
+  'glibc'
+  'gtk3'
+  'hicolor-icon-theme'
+  'libappindicator-gtk3'
+  'libsoup3'
+  'openssl'
+  'webkit2gtk-4.1'
+)
+makedepends=(
+  'cargo'
+  'git'
+  'nodejs'
+  'npm'
+  'pkgconf'
+)
+provides=('fmess')
+conflicts=('fmess-bin')
+source=(
+  "https://github.com/toanbku/fmess/archive/refs/tags/v$pkgver/$pkgname-$pkgver.tar.gz"
+  "fmess.desktop"
+)
+sha256sums=(
+  '566e9325d43b33a69c66cb422ebb61f1e62fe3f1e22ce142927359529625cb0a'
+  '73da2ed351ea6c98d20542a203d761dab2204886a066e89b8c2132d63458ef8e'
+)
+
+_srcenv() {
+  cd "$srcdir/$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  if check_option lto y; then
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+  fi
+  export CFLAGS+=' -fno-lto'
+  export CXXFLAGS+=' -fno-lto'
+}
+
+prepare() {
+  cd "$srcdir/$pkgname-$pkgver"
+  npm ci --ignore-scripts
+  cd src-tauri
+  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+  _srcenv
+  cd src-tauri
+  cargo build --release --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  install -Dm755 "src-tauri/target/$CARCH-unknown-linux-gnu/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+  install -Dm644 "$srcdir/fmess.desktop" "$pkgdir/usr/share/applications/fmess.desktop"
+
+  install -Dm644 "src-tauri/icons/32x32.png" "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/64x64.png" "$pkgdir/usr/share/icons/hicolor/64x64/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/icon.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+  install -Dm644 "branding/icon-1024.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/$pkgname.svg"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

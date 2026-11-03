@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Network;Chat;InstantMessaging;
+Comment=Unofficial desktop app for Messenger on the web
+Exec=fmess
+StartupWMClass=fmess
+Icon=fmess
+Name=fMess
+Terminal=false
+Type=Application
