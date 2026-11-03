@@ -1,7 +1,7 @@
 pkgbase = gaze
 	pkgdesc = Daemon, CLI, and PAM integration for Gaze
 	pkgver = 0.4.2
-	pkgrel = 1
+	pkgrel = 2
 	url = https://gaze.gundulabs.com
 	install = gaze.install
 	arch = x86_64

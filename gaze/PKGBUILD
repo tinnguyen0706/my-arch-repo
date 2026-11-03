@@ -3,7 +3,7 @@
 pkgname=gaze
 pkgver=0.4.2
 _ort_ver=1.31.1
-pkgrel=1
+pkgrel=2
 pkgdesc="Daemon, CLI, and PAM integration for Gaze"
 arch=('x86_64')
 url="https://gaze.gundulabs.com"
