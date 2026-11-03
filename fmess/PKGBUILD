@@ -1,7 +1,7 @@
 # Maintainer: Toan Ho <toanbku@gmail.com>
 
 pkgname=fmess
-pkgver=0.1.28
+pkgver=0.1.29
 pkgrel=1
 pkgdesc="Unofficial desktop app for Messenger on the web"
 arch=('x86_64')
