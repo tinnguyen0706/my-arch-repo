@@ -1,0 +1,29 @@
+post_install() {
+  /usr/bin/cat << 'EOF'
+[Gaze Notice] Please configure PAM or run 'gaze doctor' to check facial authentication.
+Default daemon unit: sudo systemctl enable --now gazed.service
+Config location: /etc/gaze/config.toml
+EOF
+
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    dbus-send --system --type=method_call --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 || true
+    systemctl restart polkit >/dev/null 2>&1 || true
+  fi
+}
+
+post_upgrade() {
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    dbus-send --system --type=method_call --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 || true
+    systemctl restart polkit >/dev/null 2>&1 || true
+    systemctl try-restart gazed >/dev/null 2>&1 || true
+  fi
+}
+
+pre_remove() {
+  if [ -d /run/systemd/system ]; then
+    systemctl stop gazed >/dev/null 2>&1 || true
+    systemctl disable gazed >/dev/null 2>&1 || true
+  fi
+}

@@ -3,7 +3,6 @@
 xdg-desktop-portal-umbriel-git
 umbriel-git
 open-wallpaper-engine
-howdy-next
 waywallen
 wordcraft
 gridcraft
@@ -24,3 +23,4 @@ local:tex-fmt
 local:waywallen-display
 local:ttf-ms-fonts
 local:fmess
+local:gaze

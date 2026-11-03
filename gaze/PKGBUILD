@@ -1,0 +1,96 @@
+# Maintainer: Gundu Labs <maintainers@gundulabs.com>
+
+pkgname=gaze
+pkgver=0.4.2
+_ort_ver=1.31.1
+pkgrel=1
+pkgdesc="Daemon, CLI, and PAM integration for Gaze"
+arch=('x86_64')
+url="https://gaze.gundulabs.com"
+license=('GPL-3.0-or-later')
+provides=('gaze' 'gaze-bin')
+conflicts=('gaze-bin')
+depends=(
+  'glibc'
+  'gcc-libs'
+  'gst-plugin-pipewire'
+  'gst-plugins-base'
+  'gst-plugins-good'
+  'opencv'
+  'pam'
+  'tpm2-tss'
+)
+makedepends=(
+  'cargo'
+  'clang'
+  'git'
+  'llvm'
+  'pkgconf'
+)
+backup=(
+  'etc/dbus-1/system.d/com.gundulabs.Gaze.conf'
+  'etc/gaze/config.toml'
+)
+install=gaze.install
+source=(
+  "https://github.com/GunduLabs/gaze/archive/refs/tags/v${pkgver}/${pkgname}-${pkgver}.tar.gz"
+  "onnxruntime-linux-x64-${_ort_ver}.tgz::https://github.com/microsoft/onnxruntime/releases/download/v${_ort_ver}/onnxruntime-linux-x64-${_ort_ver}.tgz"
+)
+sha256sums=(
+  '0b8b7c13645f78af17c078de21630b98986cc74147d01eb97c6a382f705fc1f8'
+  'c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9'
+)
+
+_srcenv() {
+  cd "$srcdir/$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  if check_option lto y; then
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+  fi
+  export CFLAGS+=' -fno-lto'
+  export CXXFLAGS+=' -fno-lto'
+  export OPENCV_PKGCONFIG_NAME=opencv5
+}
+
+prepare() {
+  _srcenv
+  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+  _srcenv
+  cargo build --release --locked \
+    --target "$CARCH-unknown-linux-gnu" \
+    -p gazed \
+    -p gaze-cli \
+    -p pam-gaze \
+    -p pam-gaze-grosshack
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+
+  # Daemon and CLI binaries
+  install -Dm755 "target/$CARCH-unknown-linux-gnu/release/gazed" "$pkgdir/usr/bin/gazed"
+  install -Dm755 "target/$CARCH-unknown-linux-gnu/release/gaze" "$pkgdir/usr/bin/gaze"
+
+  # PAM modules
+  install -Dm755 "target/$CARCH-unknown-linux-gnu/release/libpam_gaze.so" "$pkgdir/usr/lib/security/pam_gaze.so"
+  install -Dm755 "target/$CARCH-unknown-linux-gnu/release/libpam_gaze_grosshack.so" "$pkgdir/usr/lib/security/pam_gaze_grosshack.so"
+
+  # Systemd unit & configuration
+  install -Dm644 "packaging/config/gazed.service" "$pkgdir/usr/lib/systemd/system/gazed.service"
+  install -Dm644 "packaging/config/config.toml" "$pkgdir/etc/gaze/config.toml"
+  install -Dm644 "packaging/config/com.gundulabs.Gaze.conf" "$pkgdir/etc/dbus-1/system.d/com.gundulabs.Gaze.conf"
+  install -Dm644 "packaging/config/com.gundulabs.gaze.policy" "$pkgdir/usr/share/polkit-1/actions/com.gundulabs.gaze.policy"
+
+  # Runtime ONNX dynamic library and notices
+  install -Dm644 "$srcdir/onnxruntime-linux-x64-${_ort_ver}/lib/libonnxruntime.so" "$pkgdir/usr/lib/gaze/libonnxruntime.so"
+  install -Dm644 "$srcdir/onnxruntime-linux-x64-${_ort_ver}/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/onnxruntime/LICENSE"
+  install -Dm644 "$srcdir/onnxruntime-linux-x64-${_ort_ver}/ThirdPartyNotices.txt" "$pkgdir/usr/share/licenses/$pkgname/onnxruntime/ThirdPartyNotices.txt"
+
+  # Gaze project license
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
