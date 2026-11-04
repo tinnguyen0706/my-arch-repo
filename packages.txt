@@ -9,6 +9,7 @@ gridcraft
 deckcraft
 pdfcraft
 mailcraft
+passkeyd
 
 #####
 # Meta packages (Generic 'any')
