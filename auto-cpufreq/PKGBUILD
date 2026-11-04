@@ -1,12 +1,13 @@
 pkgname=auto-cpufreq
 pkgver=3.2.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Automatic CPU speed & power optimizer for Linux"
 arch=('any')
 url="https://github.com/AdnanHodzic/auto-cpufreq"
 license=('GPL-3.0-or-later')
 provides=('auto-cpufreq')
 conflicts=('auto-cpufreq-git' 'auto-cpufreq-rust-git')
+install=auto-cpufreq.install
 depends=(
   'python'
   'python-setuptools'

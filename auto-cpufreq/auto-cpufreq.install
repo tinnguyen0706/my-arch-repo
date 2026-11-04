@@ -1,0 +1,11 @@
+post_install() {
+  echo ":: To start and enable the auto-cpufreq service on boot, run:"
+  echo "::   sudo systemctl enable --now auto-cpufreq"
+}
+
+post_upgrade() {
+  if systemctl is-active --quiet auto-cpufreq.service; then
+    systemctl daemon-reload
+    systemctl restart auto-cpufreq.service
+  fi
+}
