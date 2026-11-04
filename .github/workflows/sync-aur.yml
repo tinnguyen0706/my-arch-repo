@@ -185,6 +185,9 @@ jobs:
                   fi
 
                   if [[ "$pkg_changed" == "true" ]]; then
+                    if [[ -f .github/scripts/update-checksums.py ]]; then
+                      python3 .github/scripts/update-checksums.py "$pkg" || echo "::warning::Failed to update checksums for $pkg"
+                    fi
                     touch "$STATUS_DIR/synced/$pkg"
                     exit 0
                   fi
