@@ -1,7 +1,7 @@
 # Maintainer: Toan Ho <toanbku@gmail.com>
 
 pkgname=fmess
-pkgver=0.1.33
+pkgver=0.1.34
 pkgrel=1
 pkgdesc="Unofficial desktop app for Messenger on the web"
 arch=('x86_64')
@@ -33,7 +33,7 @@ source=(
   "fmess.desktop"
 )
 sha256sums=(
-  '5a1522abcf65a62ef85cb8ee359af3a098713085179029bb8765c726c81bd992'
+  'e239646128a8460ceb1cfeee5b830c8c35bb925b0946c4f495c2c9bd202fca18'
   '73da2ed351ea6c98d20542a203d761dab2204886a066e89b8c2132d63458ef8e'
 )
 
