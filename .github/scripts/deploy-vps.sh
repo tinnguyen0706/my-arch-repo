@@ -97,7 +97,23 @@ for f in "${status_skipped[@]}"; do [[ -f "$f" ]] && SKIPPED_LOG+="- $(cat "$f")
 
 FAILED_COMBINED_LOG=""
 for f in "${status_failed[@]}" "${status_restored[@]}"; do
-  [[ -f "$f" ]] && FAILED_COMBINED_LOG+="- $(cat "$f")"$'\n'
+  if [[ -f "$f" ]]; then
+    pkg_status="$(cat "$f")"
+    target_key="${f#status-failed-}"
+    target_key="${target_key#status-restored-}"
+    reason_file="reason-failed-${target_key}"
+    if [[ -f "$reason_file" ]]; then
+      reason_content="$(cat "$reason_file")"
+      FAILED_COMBINED_LOG+="- ${pkg_status}"$'\n'
+      FAILED_COMBINED_LOG+="  <details><summary>Chi tiết lỗi build</summary>"$'\n\n'
+      FAILED_COMBINED_LOG+='  ```text'$'\n'
+      FAILED_COMBINED_LOG+="${reason_content}"$'\n'
+      FAILED_COMBINED_LOG+='  ```'$'\n'
+      FAILED_COMBINED_LOG+="  </details>"$'\n'
+    else
+      FAILED_COMBINED_LOG+="- ${pkg_status}"$'\n'
+    fi
+  fi
 done
 
 RELEASE_NOTES=$(cat <<EOF

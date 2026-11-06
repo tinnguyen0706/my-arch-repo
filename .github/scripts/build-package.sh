@@ -65,10 +65,10 @@ fi
 if [[ "$NEEDS_BUILD" == "false" ]]; then
   echo "$PKG ($TARGET_ARCH)" > "output/status-skipped-${PKG}-${TARGET_ARCH}.txt"
 else
-  echo "Updating checksums for $PKG..."
+  BUILD_LOG="/tmp/build-${PKG}-${TARGET_ARCH}.log"
   if [[ "$PKG" == "office-craft" ]]; then
     echo "Building meta-package $PKG with makepkg -d..."
-    sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -d --noconfirm"
+    sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && makepkg -d --noconfirm" 2>&1 | tee "$BUILD_LOG" || true
   else
     ASSUME_PKGS=$(sudo -u builder bash -lc "cd '$GITHUB_WORKSPACE/$PKG' && source PKGBUILD && echo \${pkgname[@]}")
     ASSUME_ARGS=""
@@ -80,7 +80,7 @@ else
     if [[ -x "$GITHUB_WORKSPACE/.github/scripts/rustc-wrapper.sh" ]]; then
       WRAPPER_EXPORT="export RUSTC_WRAPPER='$GITHUB_WORKSPACE/.github/scripts/rustc-wrapper.sh'; "
     fi
-    if ! sudo -u builder bash -lc "${WRAPPER_EXPORT}cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'"; then
+    if ! sudo -u builder bash -lc "${WRAPPER_EXPORT}cd '$GITHUB_WORKSPACE/$PKG' && paru $PARU_FLAGS '$GITHUB_WORKSPACE/$PKG'" 2>&1 | tee "$BUILD_LOG"; then
       echo "::warning::paru exited non-zero for $PKG; checking produced packages."
     fi
   fi
@@ -115,6 +115,13 @@ else
         RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
       fi
     done
+    if [[ -f "${BUILD_LOG:-}" ]]; then
+      mapfile -t error_snippet < <(grep -Ei 'error[:\[]|failed|fatal:|panicked at|cannot find' "$BUILD_LOG" | tail -n 8 || true)
+      if (( ${#error_snippet[@]} == 0 )); then
+        mapfile -t error_snippet < <(tail -n 8 "$BUILD_LOG" || true)
+      fi
+      printf '%s\n' "${error_snippet[@]}" > "output/reason-failed-${PKG}-${TARGET_ARCH}.txt"
+    fi
     if (( RESTORED_COUNT > 0 )); then
       echo "Restored previous build for $PKG ($TARGET_ARCH)"
       echo "$PKG ($TARGET_ARCH) — (fallback: $(basename "${FALLBACK_CANDIDATES[0]}"))" > "output/status-restored-${PKG}-${TARGET_ARCH}.txt"

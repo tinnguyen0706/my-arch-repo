@@ -175,15 +175,12 @@ jobs:
                     echo "New upstream release detected for $pkg ($gh_repo): $current_ver -> $latest_ver"
                     sed -i "s/^pkgver=.*/pkgver=$latest_ver/" "$pkg/PKGBUILD"
                     sed -i "s/^pkgrel=.*/pkgrel=1/" "$pkg/PKGBUILD"
+                    if [[ -n "$has_commithash" && -n "$latest_hash" ]]; then
+                      echo "Updating commit hash for $pkg ($gh_repo) along with new release: $has_commithash -> $latest_hash"
+                      sed -i "s/^_commithash=.*/_commithash=$latest_hash/" "$pkg/PKGBUILD"
+                    fi
                     pkg_changed=true
                   fi
-
-                  if [[ -n "$has_commithash" && -n "$latest_hash" && "$latest_hash" != "$has_commithash" ]]; then
-                    echo "New upstream commit hash detected for $pkg ($gh_repo): $has_commithash -> $latest_hash"
-                    sed -i "s/^_commithash=.*/_commithash=$latest_hash/" "$pkg/PKGBUILD"
-                    pkg_changed=true
-                  fi
-
                   if [[ "$pkg_changed" == "true" ]]; then
                     if [[ -f .github/scripts/update-checksums.py ]]; then
                       python3 .github/scripts/update-checksums.py "$pkg" || echo "::warning::Failed to update checksums for $pkg"
