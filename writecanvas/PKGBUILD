@@ -1,0 +1,96 @@
+pkgname=writecanvas
+pkgver=1.1.0
+pkgrel=1
+pkgdesc="Cross-platform note-taking & inking app. Reads and writes Scrble-Ink-compatible PNG notes (sINK replay + paper chunks)."
+arch=('x86_64')
+url="https://github.com/ThanhNguyxnOrg/WriteCanvas"
+license=('Apache-2.0')
+depends=(
+  'alsa-lib'
+  'at-spi2-core'
+  'cairo'
+  'cups'
+  'dbus'
+  'expat'
+  'fontconfig'
+  'freetype2'
+  'glib2'
+  'glibc'
+  'gtk3'
+  'hicolor-icon-theme'
+  'libdrm'
+  'libnotify'
+  'libpulse'
+  'libx11'
+  'libxcb'
+  'libxcomposite'
+  'libxdamage'
+  'libxext'
+  'libxfixes'
+  'libxkbcommon'
+  'libxrandr'
+  'mesa'
+  'nspr'
+  'nss'
+  'pango'
+  'systemd-libs'
+)
+optdepends=(
+  'libappindicator-gtk3: StatusNotifierItem tray support'
+  'org.freedesktop.secrets: Password and secret storage'
+)
+provides=('writecanvas')
+conflicts=('writecanvas-bin')
+options=(!strip !debug)
+source=(
+  "${pkgname}-${pkgver}.deb::https://github.com/ThanhNguyxnOrg/WriteCanvas/releases/download/v${pkgver}/writecanvas_${pkgver}_amd64.deb"
+  "LICENSE-${pkgver}::https://raw.githubusercontent.com/ThanhNguyxnOrg/WriteCanvas/v${pkgver}/LICENSE"
+)
+sha256sums=(
+  '31ea2630481d0c9df773128b4420276e7520f672875d68352d0c581cc7f3fc7c'
+  'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30'
+)
+
+prepare() {
+  bsdtar -xf "data.tar.xz" -C "${srcdir}"
+  sed -i 's|/opt/WriteCanvas/writecanvas|/usr/bin/writecanvas|g' "${srcdir}/usr/share/applications/writecanvas.desktop"
+}
+
+package() {
+  # Install packaged application files to /usr/lib/writecanvas
+  install -d "${pkgdir}/usr/lib/${pkgname}"
+  cp -a "${srcdir}/opt/WriteCanvas/." "${pkgdir}/usr/lib/${pkgname}/"
+
+  # Ensure chrome-sandbox permissions match standard Chromium packaging
+  chmod 4755 "${pkgdir}/usr/lib/${pkgname}/chrome-sandbox" 2>/dev/null || true
+
+  # Symlink main executable to /usr/bin
+  install -d "${pkgdir}/usr/bin"
+  ln -s "/usr/lib/${pkgname}/writecanvas" "${pkgdir}/usr/bin/writecanvas"
+
+  # Desktop integration
+  install -Dm644 "${srcdir}/usr/share/applications/writecanvas.desktop" \
+    "${pkgdir}/usr/share/applications/writecanvas.desktop"
+
+  # Hicolor icons
+  install -Dm644 "${srcdir}/usr/share/icons/hicolor/512x512/apps/writecanvas.png" \
+    "${pkgdir}/usr/share/icons/hicolor/512x512/apps/writecanvas.png"
+
+  for size in 16 24 32 48 64 128 256; do
+    install -d "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps"
+    if command -v magick >/dev/null 2>&1; then
+      magick "${srcdir}/usr/share/icons/hicolor/512x512/apps/writecanvas.png" -resize "${size}x${size}" \
+        "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/writecanvas.png"
+    elif command -v convert >/dev/null 2>&1; then
+      convert "${srcdir}/usr/share/icons/hicolor/512x512/apps/writecanvas.png" -resize "${size}x${size}" \
+        "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/writecanvas.png"
+    fi
+  done
+
+  # Licenses
+  install -Dm644 "${srcdir}/LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "${pkgdir}/usr/lib/${pkgname}/LICENSE.electron.txt" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.electron.txt"
+  install -Dm644 "${pkgdir}/usr/lib/${pkgname}/LICENSES.chromium.html" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSES.chromium.html"
+}

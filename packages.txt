@@ -26,3 +26,4 @@ local:waywallen-display
 local:ttf-ms-fonts
 local:fmess
 local:gaze
+local:writecanvas
