@@ -10,6 +10,7 @@ deckcraft
 pdfcraft
 mailcraft
 passkeyd
+linux-id
 
 #####
 # Meta packages (Generic 'any')
