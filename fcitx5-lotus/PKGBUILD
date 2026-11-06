@@ -1,7 +1,7 @@
 # Maintainer: Nguyen Ky <nhktmdzhg at google mail>
 
 pkgname=fcitx5-lotus
-pkgver=6.0.5
+pkgver=6.0.6
 pkgrel=1
 pkgdesc="Vietnamese input method for fcitx5"
 arch=('x86_64')
@@ -29,7 +29,9 @@ depends=(
 makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'python')
 install='fcitx5-lotus.install'
 source=("git+https://github.com/LotusInputMethod/fcitx5-lotus.git#tag=v$pkgver")
-sha256sums=('SKIP')
+sha256sums=(
+  'SKIP'
+)
 
 build() {
   cd "$srcdir/fcitx5-lotus"
