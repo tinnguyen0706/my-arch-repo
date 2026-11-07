@@ -84,7 +84,7 @@ jobs:
           wave2=()
           for p in "${pkgs[@]}"; do
             case "$p" in
-              open-wallpaper-engine|umbriel-git|office-craft)
+              open-wallpaper-engine|umbriel-git|office-craft|osu-lazer-bin)
                 wave2+=("$p")
                 ;;
               *)

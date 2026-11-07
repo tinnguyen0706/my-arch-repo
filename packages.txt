@@ -11,6 +11,9 @@ pdfcraft
 mailcraft
 passkeyd
 linux-id
+canon-lbp2900-capt
+osu-mime
+osu-lazer-bin
 
 #####
 # Meta packages (Generic 'any')
