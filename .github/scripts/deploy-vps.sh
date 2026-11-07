@@ -22,9 +22,9 @@ ssh-keyscan -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
 SSH_CMD="ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
 
-# 2. Đồng bộ toàn bộ các file gói đang có trên VPS về runner
-echo "Syncing all existing packages from VPS via rsync..."
-rsync -av --ignore-existing -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/*.pkg.tar.zst" ./ || true
+# 2. Đồng bộ các file database hiện có từ VPS về runner (chỉ ~36 KB thay vì kéo toàn bộ kho package 1.8GB)
+echo "Syncing existing database files from VPS via rsync..."
+rsync -av -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.tar.gz" ./ || true
 
 for f in *.pkg.tar.zst; do
   if [[ ! -s "$f" ]]; then
@@ -35,26 +35,25 @@ done
 
 pkgs_all=( *.pkg.tar.zst )
 if (( ${#pkgs_all[@]} == 0 )); then
-  echo "No packages found. Exiting."
-  exit 0
+  echo "No new packages found to add to database."
+else
+  # 3. Phân loại và nạp các gói mới vừa build vào database repo-add (lũy kế)
+  python3 "$GITHUB_WORKSPACE/.github/scripts/filter-latest-pkgs.py"
+
+  mapfile -t pkgs_v3 < pkgs_v3.txt
+  mapfile -t pkgs_v4 < pkgs_v4.txt
+
+  if (( ${#pkgs_v3[@]} > 0 )); then
+    echo "Updating tinhiem (v3) database: ${#pkgs_v3[@]} package(s)"
+    repo-add "tinhiem.db.tar.gz" "${pkgs_v3[@]}"
+  fi
+
+  if (( ${#pkgs_v4[@]} > 0 )); then
+    echo "Updating tinhiem-v4 database: ${#pkgs_v4[@]} package(s)"
+    repo-add "tinhiem-v4.db.tar.gz" "${pkgs_v4[@]}"
+  fi
+  rm -f pkgs_v3.txt pkgs_v4.txt *.old
 fi
-
-# 3. Lọc chỉ nạp phiên bản cao nhất của từng package vào database repo-add
-python3 "$GITHUB_WORKSPACE/.github/scripts/filter-latest-pkgs.py"
-
-mapfile -t pkgs_v3 < pkgs_v3.txt
-mapfile -t pkgs_v4 < pkgs_v4.txt
-
-if (( ${#pkgs_v3[@]} > 0 )); then
-  echo "Creating tinhiem (v3) database: ${#pkgs_v3[@]} package(s)"
-  repo-add "tinhiem.db.tar.gz" "${pkgs_v3[@]}"
-fi
-
-if (( ${#pkgs_v4[@]} > 0 )); then
-  echo "Creating tinhiem-v4 database: ${#pkgs_v4[@]} package(s)"
-  repo-add "tinhiem-v4.db.tar.gz" "${pkgs_v4[@]}"
-fi
-rm -f pkgs_v3.txt pkgs_v4.txt
 
 echo "Deploying packages and databases to VPS /var/www/repo..."
 rsync -av -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
