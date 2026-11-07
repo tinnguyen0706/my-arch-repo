@@ -24,7 +24,7 @@ SSH_CMD="ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
 
 # 2. Đồng bộ các file database hiện có từ VPS về runner (chỉ ~36 KB thay vì kéo toàn bộ kho package 1.8GB)
 echo "Syncing existing database files from VPS via rsync..."
-rsync -av -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.tar.gz" ./ || true
+rsync -av -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.db* ${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.files*" ./ || true
 
 for f in *.pkg.tar.zst; do
   if [[ ! -s "$f" ]]; then
@@ -53,13 +53,12 @@ else
     repo-add "tinhiem-v4.db.tar.gz" "${pkgs_v4[@]}"
   fi
   rm -f pkgs_v3.txt pkgs_v4.txt *.old
-fi
 
-echo "Deploying packages and databases to VPS /var/www/repo..."
-rsync -av -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
+  echo "Deploying packages and databases to VPS /var/www/repo..."
+  rsync -av -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
 
-# 4. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
-$SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
+  # 4. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
+  $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
 from pathlib import Path
 from collections import defaultdict
 repo_dir = Path("/var/www/repo")
@@ -75,7 +74,7 @@ for (pkgname, arch), files in groups.items():
     for old_file in files[3:]:
         old_file.unlink(missing_ok=True)
 PYEOF'
-
+fi
 # 5. Cập nhật Release Tag trên GitHub (Chỉ lưu Changelog & Notes)
 if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   gh release create "$TAG" --repo "$REPO" \

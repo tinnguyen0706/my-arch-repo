@@ -51,18 +51,7 @@ else
 fi
 
 if [[ "$NEEDS_BUILD" == "false" ]]; then
-  echo "Package $PKG ($TARGET_ARCH) is up to date. Fetching specific cache from release."
-  for pkg_path in $EXPECTED_PKGS; do
-    pkg_basename=$(basename "$pkg_path")
-    if ! curl -sSLf "https://arch.tinhiem.id.vn/$pkg_basename" -o "output/$pkg_basename" 2>/dev/null; then
-      echo "::warning::Failed to fetch $pkg_basename cache. Forcing rebuild."
-      NEEDS_BUILD=true
-      break
-    fi
-  done
-fi
-
-if [[ "$NEEDS_BUILD" == "false" ]]; then
+  echo "Package $PKG ($TARGET_ARCH) is up to date on repository."
   echo "$PKG ($TARGET_ARCH)" > "output/status-skipped-${PKG}-${TARGET_ARCH}.txt"
 else
   BUILD_LOG="/tmp/build-${PKG}-${TARGET_ARCH}.log"
@@ -109,12 +98,6 @@ else
         add_candidate "$(awk '/^%FILENAME%/{getline; print; exit}' "$desc_file")"
       done
     fi
-    RESTORED_COUNT=0
-    for file_name in "${FALLBACK_CANDIDATES[@]}"; do
-      if curl -sSLf "https://arch.tinhiem.id.vn/$file_name" -o "output/$file_name" 2>/dev/null; then
-        RESTORED_COUNT=$(( RESTORED_COUNT + 1 ))
-      fi
-    done
     if [[ -f "${BUILD_LOG:-}" ]]; then
       mapfile -t error_snippet < <(grep -Ei 'error[:\[]|failed|fatal:|panicked at|cannot find' "$BUILD_LOG" | tail -n 8 || true)
       if (( ${#error_snippet[@]} == 0 )); then
@@ -122,11 +105,11 @@ else
       fi
       printf '%s\n' "${error_snippet[@]}" > "output/reason-failed-${PKG}-${TARGET_ARCH}.txt"
     fi
-    if (( RESTORED_COUNT > 0 )); then
-      echo "Restored previous build for $PKG ($TARGET_ARCH)"
-      echo "$PKG ($TARGET_ARCH) — (fallback: $(basename "${FALLBACK_CANDIDATES[0]}"))" > "output/status-restored-${PKG}-${TARGET_ARCH}.txt"
+    if (( ${#FALLBACK_CANDIDATES[@]} > 0 )); then
+      echo "Retained existing build on repository for $PKG ($TARGET_ARCH)"
+      echo "$PKG ($TARGET_ARCH) — (fallback: retained $(basename "${FALLBACK_CANDIDATES[0]}"))" > "output/status-restored-${PKG}-${TARGET_ARCH}.txt"
     else
-      echo "Fallback failed: no previous file for $PKG ($TARGET_ARCH)"
+      echo "Build failed: no previous file for $PKG ($TARGET_ARCH)"
       echo "$PKG ($TARGET_ARCH)" > "output/status-failed-${PKG}-${TARGET_ARCH}.txt"
     fi
   fi
