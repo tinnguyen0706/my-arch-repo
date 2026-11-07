@@ -1,0 +1,26 @@
+# Maintainer: tinnguyen0706
+pkgname=hollow-knight-cursor-theme
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Hollow Knight complete cursor theme for Linux (X11 & Wayland)"
+arch=('any')
+url="https://www.teamcherry.com.au"
+license=('custom:Public Domain')
+options=('!strip')
+source=("$pkgname-$pkgver.tar.xz")
+sha256sums=('96dbe3cbfa406a4510305b130e67c3394ce703329106b6e1135677a030d5c172')
+
+package() {
+  install -d "$pkgdir/usr/share/icons/HollowKnight"
+  cp -dr --no-preserve=ownership "$srcdir/HollowKnight/." "$pkgdir/usr/share/icons/HollowKnight/"
+
+  find "$pkgdir/usr/share/icons/HollowKnight" -type d -exec chmod 755 {} +
+  find "$pkgdir/usr/share/icons/HollowKnight" -type f -exec chmod 644 {} +
+
+  install -dm755 "$pkgdir/usr/share/licenses/$pkgname"
+  cat << 'EOF' > "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+Hollow Knight Cursor Theme
+License: Public Domain
+EOF
+  chmod 644 "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
