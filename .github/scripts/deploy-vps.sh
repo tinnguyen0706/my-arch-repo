@@ -24,8 +24,8 @@ SSH_CMD="ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
 
 # 2. Đồng bộ các file database hiện có từ VPS về runner (chỉ ~36 KB thay vì kéo toàn bộ kho package 1.8GB)
 echo "Syncing existing database files from VPS via rsync..."
-rsync -av -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.db* ${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.files*" ./ || true
-
+rsync -avL -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.tar.gz" ./ || true
+rm -f tinhiem*.db tinhiem*.files
 for f in *.pkg.tar.zst; do
   if [[ ! -s "$f" ]]; then
     echo "Removing empty/invalid package file $f"
@@ -55,7 +55,7 @@ else
   rm -f pkgs_v3.txt pkgs_v4.txt *.old
 
   echo "Deploying packages and databases to VPS /var/www/repo..."
-  rsync -av -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
+  rsync -avl -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
 
   # 4. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
   $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"

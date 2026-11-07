@@ -20,8 +20,7 @@ osu-lazer-bin
 local:office-craft
 
 #####
-# Local packages (Compiled v3/v4; generic packages like auto-cpufreq and zalo are populated to both DBs)
-local:auto-cpufreq
+# Local packages (Compiled v3/v4; generic packages like zalo are populated to both DBs)
 local:zalo
 local:fcitx5-lotus
 local:tex-fmt
