@@ -22,10 +22,12 @@ ssh-keyscan -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
 SSH_CMD="ssh -i $HOME/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
 
-# 2. Đồng bộ các file database hiện có từ VPS về runner (chỉ ~36 KB thay vì kéo toàn bộ kho package 1.8GB)
+# 2. Đồng bộ các file database hiện có từ VPS về runner (chỉ ~100 KB thay vì kéo toàn bộ kho package 1.8GB)
 echo "Syncing existing database files from VPS via rsync..."
-rsync -avL -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*.tar.gz" ./ || true
-rm -f tinhiem*.db tinhiem*.files
+rsync -avL -e "$SSH_CMD" "${VPS_USER}@${VPS_HOST}:/var/www/repo/tinhiem*" ./ || true
+
+# Chuẩn hóa và đồng bộ db/files archive để tránh crash CachyOS repo-add và dọn dẹp packages đã gỡ
+python3 "$GITHUB_WORKSPACE/.github/scripts/sync-databases.py" "$GITHUB_WORKSPACE/packages.txt"
 for f in *.pkg.tar.zst; do
   if [[ ! -s "$f" ]]; then
     echo "Removing empty/invalid package file $f"
@@ -55,25 +57,34 @@ else
   rm -f pkgs_v3.txt pkgs_v4.txt *.old
 
   echo "Deploying packages and databases to VPS /var/www/repo..."
+  $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'rm -f /var/www/repo/tinhiem*.db /var/www/repo/tinhiem*.files'
   rsync -avl -e "$SSH_CMD" *.pkg.tar.zst tinhiem*.db* tinhiem*.files* "${VPS_USER}@${VPS_HOST}:/var/www/repo/"
+  $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'cd /var/www/repo && ln -sf tinhiem.db.tar.gz tinhiem.db && ln -sf tinhiem.files.tar.gz tinhiem.files && ln -sf tinhiem-v4.db.tar.gz tinhiem-v4.db && ln -sf tinhiem-v4.files.tar.gz tinhiem-v4.files'
 
-  # 4. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất
-  $SSH_CMD "${VPS_USER}@${VPS_HOST}" 'python3 - << "PYEOF"
+  # 4. Dọn dẹp bản cũ trên VPS: giữ tối đa 3 phiên bản gần nhất và xóa packages không còn trong packages.txt
+  ACTIVE_LIST=$(grep -v '^#' "$GITHUB_WORKSPACE/packages.txt" | sed 's/local://' | sed '/^$/d' | tr '\n' ' ')
+  $SSH_CMD "${VPS_USER}@${VPS_HOST}" "python3 - '$ACTIVE_LIST' << 'PYEOF'
+import sys
 from pathlib import Path
 from collections import defaultdict
-repo_dir = Path("/var/www/repo")
+
+active_pkgs = set(sys.argv[1].split()) if len(sys.argv) > 1 and sys.argv[1].strip() else set()
+repo_dir = Path('/var/www/repo')
 groups = defaultdict(list)
-for p in repo_dir.glob("*.pkg.tar.zst"):
-    stem = p.name[:-len(".pkg.tar.zst")]
-    parts = stem.rsplit("-", 3)
+for p in repo_dir.glob('*.pkg.tar.zst'):
+    stem = p.name[:-len('.pkg.tar.zst')]
+    parts = stem.rsplit('-', 3)
     if len(parts) == 4:
         pkgname, pkgver, pkgrel, arch = parts
+        if active_pkgs and pkgname not in active_pkgs:
+            p.unlink(missing_ok=True)
+            continue
         groups[(pkgname, arch)].append(p)
 for (pkgname, arch), files in groups.items():
     files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
     for old_file in files[3:]:
         old_file.unlink(missing_ok=True)
-PYEOF'
+PYEOF"
 fi
 # 5. Cập nhật Release Tag trên GitHub (Chỉ lưu Changelog & Notes)
 if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
