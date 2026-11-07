@@ -1,0 +1,68 @@
+--- a/driver/src/physical_device.rs
++++ b/driver/src/physical_device.rs
+@@ -1,10 +1,9 @@
+-use rusb::{Device, DeviceHandle, Error as UsbError, GlobalContext, devices};
++use rusb::{Device, DeviceHandle, Direction, Error as UsbError, GlobalContext, TransferType, devices};
+ use std::time::Duration;
+ 
+ pub const DATA_READ_TIMEOUT: Duration = Duration::from_millis(60);
+ const DATA_INTERFACE: u8 = 1;
+ const MODE_INTERFACE: u8 = 2;
+-const DATA_ENDPOINT: u8 = 0x84;
+ const ACTIVE_CONFIGURATION: u8 = 1;
+ 
+ // Complete 10moons-probe sequence for the Gotop/SZ PENG YI T501
+@@ -19,6 +18,7 @@ const FULL_AREA_REPORTS: [[u8; 8]; 4] = [
+ pub struct PhysicalDevice {
+     handle: DeviceHandle<GlobalContext>,
+     detached_interfaces: Vec<u8>,
++    endpoint: u8,
+ }
+ 
+ impl PhysicalDevice {
+@@ -36,7 +36,24 @@ impl PhysicalDevice {
+ 
+     pub fn read(&self, buffer: &mut [u8]) -> Result<usize, UsbError> {
+         self.handle
+-            .read_interrupt(DATA_ENDPOINT, buffer, DATA_READ_TIMEOUT)
++            .read_interrupt(self.endpoint, buffer, DATA_READ_TIMEOUT)
++    }
++
++    fn find_data_endpoint(device: &Device<GlobalContext>) -> u8 {
++        if let Ok(config) = device.active_config_descriptor().or_else(|_| device.config_descriptor(0)) {
++            for interface in config.interfaces() {
++                for descriptor in interface.descriptors() {
++                    if descriptor.interface_number() == DATA_INTERFACE {
++                        for ep in descriptor.endpoint_descriptors() {
++                            if ep.direction() == Direction::In && ep.transfer_type() == TransferType::Interrupt {
++                                return ep.address();
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        0x83
+     }
+ 
+     fn send_full_area_reports(device: &Device<GlobalContext>) -> Result<(), UsbError> {
+@@ -60,9 +77,10 @@ impl PhysicalDevice {
+     }
+ 
+     fn open_reader(device: &Device<GlobalContext>) -> Result<Self, UsbError> {
++        let endpoint = Self::find_data_endpoint(device);
++
+         let mut handle = device.open()?;
+         handle.reset()?;
+-
+         let detached_interfaces = Self::detach_kernel_interfaces(&mut handle)?;
+ 
+         let setup_result = (|| {
+@@ -83,6 +101,7 @@ impl PhysicalDevice {
+         Ok(Self {
+             handle,
+             detached_interfaces,
++            endpoint,
+         })
+     }
+ 

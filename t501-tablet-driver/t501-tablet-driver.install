@@ -1,0 +1,25 @@
+post_install() {
+  echo -e "\e[1m==> \e[32mt501-tablet-driver đã được cài đặt thành công!\e[0m"
+  echo -e "    Driver hỗ trợ bảng vẽ Gotop T501 / Tomate MTM-1106 / VINSA 1060Plus (USB 08f2:6811)."
+  echo
+  echo -e "\e[1m==> \e[36mCơ chế hoạt động:\e[0m"
+  echo "    Package đã tích hợp sẵn udev rule (/usr/lib/udev/rules.d/60-t501-tablet.rules)."
+  echo "    Driver sẽ tự động khởi chạy dưới dạng systemd user service khi bạn cắm bảng vẽ vào máy."
+  echo
+  echo -e "\e[1m==> \e[33mHướng dẫn sử dụng & kích hoạt ngay:\e[0m"
+  echo "    1. Nạp lại udev rules (chỉ cần chạy một lần sau khi cài):"
+  echo -e "       \e[1;37msudo udevadm control --reload-rules && sudo udevadm trigger\e[0m"
+  echo
+  echo "    2. Nếu bảng vẽ đang cắm sẵn, bạn có thể khởi động driver ngay:"
+  echo -e "       \e[1;37msystemctl --user start t501-tablet.service\e[0m"
+  echo
+  echo "    3. Kiểm tra trạng thái driver:"
+  echo -e "       \e[1;37msystemctl --user status t501-tablet.service\e[0m"
+  echo
+  echo "    4. (Tùy chọn) Bật driver luôn tự khởi động cùng phiên đăng nhập (login):"
+  echo -e "       \e[1;37msystemctl --user enable t501-tablet.service\e[0m"
+}
+
+post_upgrade() {
+  post_install
+}

@@ -1,0 +1,65 @@
+# Maintainer: tinnguyen0706
+pkgname=t501-tablet-driver
+pkgver=1.1.0
+pkgrel=1
+pkgdesc="Userspace driver for T501/Tomate MTM-1106 drawing tablets (USB 08f2:6811), with full-area mapping, pressure and automatic hotplug support"
+arch=('x86_64')
+url="https://github.com/inaciogarcez/t501-tablet-linux-driver"
+license=('GPL-3.0-only')
+depends=('glibc' 'gcc-libs' 'libusb')
+makedepends=('cargo' 'git')
+install=$pkgname.install
+source=(
+  "$pkgname-$pkgver::git+https://github.com/inaciogarcez/t501-tablet-linux-driver.git#tag=v$pkgver"
+  "auto-detect-endpoint.patch"
+)
+sha256sums=(
+  'SKIP'
+  '3d42e2ac66811171ee0f15d67f9bd9531746804470f3e45a7bb07b704f923325'
+)
+
+# NOTE: Upstream v1.1.0 hardcode DATA_ENDPOINT = 0x84, gay loi "Input/Output Error"
+# tren cac bien the phan cung T501 dung endpoint 0x83.
+# File auto-detect-endpoint.patch giup tu dong do tim endpoint interrupt IN phu hop.
+# Neu cac ban release tiep theo cua upstream (v1.2.0+) da merge logic nay,
+# hay go bo file patch khoi source=() va prepare().
+prepare() {
+  cd "$pkgname-$pkgver"
+  patch -Np1 -i "$srcdir/auto-detect-endpoint.patch"
+
+  cd driver
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+  cd "$pkgname-$pkgver/driver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  if check_option lto y; then
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+  fi
+  export CFLAGS+=' -fno-lto'
+  export CXXFLAGS+=' -fno-lto'
+  cargo build --frozen --release --target "$CARCH-unknown-linux-gnu"
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+
+  # Install binary
+  install -Dm755 "driver/target/$CARCH-unknown-linux-gnu/release/v1060p" "$pkgdir/usr/bin/$pkgname"
+
+  # Install udev rule (trigger systemd user service on device connection)
+  install -Dm644 "packaging/60-tomate-mtm1106.rules" "$pkgdir/usr/lib/udev/rules.d/60-t501-tablet.rules"
+  sed -i 's|tomate-mtm1106\.service|t501-tablet\.service|g' "$pkgdir/usr/lib/udev/rules.d/60-t501-tablet.rules"
+
+  # Install systemd user service
+  install -Dm644 "packaging/tomate-mtm1106.service" "$pkgdir/usr/lib/systemd/user/t501-tablet.service"
+  sed -i 's|ExecStart=.*|ExecStart=/usr/bin/t501-tablet-driver|' "$pkgdir/usr/lib/systemd/user/t501-tablet.service"
+  sed -i 's|PartOf=plasma-workspace\.target|PartOf=graphical-session\.target|' "$pkgdir/usr/lib/systemd/user/t501-tablet.service"
+
+  # Install license
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

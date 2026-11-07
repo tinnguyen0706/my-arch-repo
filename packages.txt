@@ -29,3 +29,4 @@ local:ttf-ms-fonts
 local:fmess
 local:gaze
 local:writecanvas
+local:t501-tablet-driver
