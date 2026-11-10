@@ -14,6 +14,7 @@ linux-id
 canon-lbp2900-capt
 osu-mime
 osu-lazer-bin
+zapret2
 
 #####
 # Meta packages (Generic 'any')

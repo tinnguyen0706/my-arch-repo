@@ -113,17 +113,20 @@ for f in "${status_failed[@]}" "${status_restored[@]}"; do
     reason_file="reason-failed-${target_key}"
     if [[ -f "$reason_file" ]]; then
       reason_content="$(cat "$reason_file")"
-      FAILED_COMBINED_LOG+="- ${pkg_status}"$'\n'
-      FAILED_COMBINED_LOG+="  <details><summary>Chi tiết lỗi build</summary>"$'\n\n'
-      FAILED_COMBINED_LOG+='  ```text'$'\n'
+      clean_title="${pkg_status%% —*}"
+      FAILED_COMBINED_LOG+="- ${pkg_status}"$'\n\n'
+      FAILED_COMBINED_LOG+="<details>"$'\n'
+      FAILED_COMBINED_LOG+="<summary>🔍 Chi tiết lỗi: ${clean_title}</summary>"$'\n\n'
+      FAILED_COMBINED_LOG+='```text'$'\n'
       FAILED_COMBINED_LOG+="${reason_content}"$'\n'
-      FAILED_COMBINED_LOG+='  ```'$'\n'
-      FAILED_COMBINED_LOG+="  </details>"$'\n'
+      FAILED_COMBINED_LOG+='```'$'\n\n'
+      FAILED_COMBINED_LOG+="</details>"$'\n\n'
     else
-      FAILED_COMBINED_LOG+="- ${pkg_status}"$'\n'
+      FAILED_COMBINED_LOG+="- ${pkg_status}"$'\n\n'
     fi
   fi
 done
+FAILED_COMBINED_LOG="${FAILED_COMBINED_LOG%$'\n\n'}"
 
 RELEASE_NOTES=$(cat <<EOF
 ### 📦 Repository Update Summary

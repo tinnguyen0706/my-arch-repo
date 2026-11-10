@@ -99,9 +99,9 @@ else
       done
     fi
     if [[ -f "${BUILD_LOG:-}" ]]; then
-      mapfile -t error_snippet < <(grep -Ei 'error[:\[]|failed|fatal:|panicked at|cannot find' "$BUILD_LOG" | tail -n 8 || true)
+      mapfile -t error_snippet < <(grep -Ei 'error[:\[]|failed|fatal:|panicked at|cannot find' "$BUILD_LOG" | grep -Ev 'failed retrieving file' | tail -n 10 || true)
       if (( ${#error_snippet[@]} == 0 )); then
-        mapfile -t error_snippet < <(tail -n 8 "$BUILD_LOG" || true)
+        mapfile -t error_snippet < <(tail -n 10 "$BUILD_LOG" || true)
       fi
       printf '%s\n' "${error_snippet[@]}" > "output/reason-failed-${PKG}-${TARGET_ARCH}.txt"
     fi

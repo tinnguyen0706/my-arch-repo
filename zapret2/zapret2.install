@@ -1,0 +1,22 @@
+_srvname=zapret2.service
+
+post_install() {
+  cat << EOF
+==> zapret2 installed.
+==> Configuration file: /opt/zapret2/config
+==> To enable and start zapret2 service:
+==>   sudo systemctl daemon-reload
+==>   sudo systemctl enable --now zapret2.service
+EOF
+}
+
+post_upgrade() {
+  systemctl daemon-reload
+  if systemctl is-active --quiet "$_srvname"; then
+    systemctl restart "$_srvname"
+  fi
+}
+
+pre_remove() {
+  systemctl disable --now "$_srvname"
+}
