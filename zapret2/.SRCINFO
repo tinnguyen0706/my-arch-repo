@@ -1,30 +1,25 @@
 pkgbase = zapret2
-	pkgdesc = anti-dpi software
+	pkgdesc = Anti-DPI software
 	pkgver = 1.0.7
 	pkgrel = 1
 	url = https://github.com/bol-van/zapret2
 	install = zapret2.install
 	arch = x86_64
 	license = MIT
+	makedepends = git
 	depends = bind
 	depends = curl
 	depends = iptables
-	depends = libcap
-	depends = libmnl
 	depends = libnetfilter_queue
 	depends = luajit
 	depends = nmap
-	depends = systemd-libs
-	depends = zlib
-	optdepends = ipset: required for iptables ipset mode
-	optdepends = nftables: required for nftables mode
-	optdepends = openbsd-netcat: alternative netcat for blockcheck2
+	optdepends = ipset: required for iptables mode
 	provides = zapret2
 	conflicts = zapret2-git
 	conflicts = zapret2-bin
 	backup = opt/zapret2/config
 	backup = opt/zapret2/ipset/zapret-hosts-user-exclude.txt
-	source = zapret2-1.0.7.tar.gz::https://github.com/bol-van/zapret2/archive/refs/tags/v1.0.7.tar.gz
-	sha256sums = 7ecae682965701aad2e5adead3bcbb62c7846425f3666eb2fd6ec3df29b1d632
+	source = zapret2::git+https://github.com/bol-van/zapret2.git#tag=v1.0.7
+	sha256sums = c50b22342ced6fa79857a87ba9bdd13274ed2777077d5642600014d1ae02631c
 
 pkgname = zapret2
