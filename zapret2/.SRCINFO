@@ -1,7 +1,7 @@
 pkgbase = zapret2
 	pkgdesc = Anti-DPI software
 	pkgver = 1.0.7
-	pkgrel = 2
+	pkgrel = 1
 	url = https://github.com/bol-van/zapret2
 	install = zapret2.install
 	arch = x86_64

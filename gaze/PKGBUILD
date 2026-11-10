@@ -1,7 +1,7 @@
 # Maintainer: Gundu Labs <maintainers@gundulabs.com>
 
 pkgname=gaze
-pkgver=0.5.0
+pkgver=0.5.1
 _ort_ver=1.31.1
 pkgrel=1
 pkgdesc="Daemon, CLI, and PAM integration for Gaze"
@@ -37,7 +37,7 @@ source=(
   "onnxruntime-linux-x64-${_ort_ver}.tgz::https://github.com/microsoft/onnxruntime/releases/download/v${_ort_ver}/onnxruntime-linux-x64-${_ort_ver}.tgz"
 )
 sha256sums=(
-  'bd61dd7a41afce78bad30057eb23d3c0ee100d41e88348f844ac669f1456c665'
+  '650120a3dce12b0a7a4509e235066d453d4f5636dc35307f32df818c410c33da'
   'c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9'
 )
 
