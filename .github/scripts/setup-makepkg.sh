@@ -16,6 +16,8 @@ sed -i 's/^PKGDEST=/#PKGDEST=/g' /etc/makepkg.conf
 sed -i 's/^LOGDEST=/#LOGDEST=/g' /etc/makepkg.conf
 sed -i 's/^PACKAGECARCH=/#PACKAGECARCH=/g' /etc/makepkg.conf
 echo "PACKAGECARCH=\"${TARGET_PKGCARCH}\"" >> /etc/makepkg.conf
+sed -i 's/^#*PACKAGER=.*/#PACKAGER=/g' /etc/makepkg.conf
+echo "PACKAGER=\"\${PACKAGER:-tinhiem <nguyentrongtin2807@gmail.com>}\"" >> /etc/makepkg.conf
 
 echo 'export CARGO_HOST_RUSTFLAGS="-C target-cpu=x86-64-v3"' >> /etc/profile.d/cargo-host.sh
 echo 'export CARGO_TARGET_APPLIES_TO_HOST=false' >> /etc/profile.d/cargo-host.sh
