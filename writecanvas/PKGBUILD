@@ -1,5 +1,5 @@
 pkgname=writecanvas
-pkgver=1.2.0
+pkgver=1.2.1
 pkgrel=1
 pkgdesc="Cross-platform note-taking & inking app. Reads and writes Scrble-Ink-compatible PNG notes (sINK replay + paper chunks)."
 arch=('x86_64')
@@ -47,7 +47,7 @@ source=(
   "LICENSE-${pkgver}::https://raw.githubusercontent.com/ThanhNguyxnOrg/WriteCanvas/v${pkgver}/LICENSE"
 )
 sha256sums=(
-  'd5c4d222376e3b5087da38019884352f18013c6a3785440a82d38e63b3b89e06'
+  'ccc0247a2479f80e1302a6db27fd1a169a75838e552cbc55b23aa3886180dd7e'
   'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30'
 )
 
