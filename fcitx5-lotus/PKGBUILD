@@ -1,3 +1,4 @@
+# Upstream AUR: https://aur.archlinux.org/packages/fcitx5-lotus (verbatim v6.1.1, but OpenRC/Runit OFF)
 # Maintainer: Nguyen Ky <nhktmdzhg at google mail>
 
 pkgname=fcitx5-lotus
@@ -7,8 +8,6 @@ pkgdesc="Vietnamese input method for fcitx5"
 arch=('x86_64')
 url="https://github.com/LotusInputMethod/fcitx5-lotus"
 license=('GPL-3.0-or-later')
-provides=('fcitx5-lotus')
-conflicts=('fcitx5-lotus-bin' 'fcitx5-lotus-git')
 depends=(
   'acl'
   'fcitx5'
@@ -18,6 +17,7 @@ depends=(
   'libevdev'
   'libinput'
   'libnotify'
+  'libxcb'
   'hicolor-icon-theme'
   'glibc'
   'libstdc++'
@@ -26,18 +26,14 @@ depends=(
   'python-qtpy'
   'python-dbus'
 )
-makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'python')
+makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'python' 'wayland')
 install='fcitx5-lotus.install'
 source=("git+https://github.com/LotusInputMethod/fcitx5-lotus.git#tag=v$pkgver")
-sha256sums=(
-  'SKIP'
-)
+sha256sums=('SKIP')
 
 build() {
   cd "$srcdir/fcitx5-lotus"
-  cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=/usr/lib . \
-    -DINSTALL_OPENRC=OFF \
-    -DINSTALL_RUNIT=OFF
+  cmake \
   make
 }
 
