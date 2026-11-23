@@ -133,6 +133,7 @@ RELEASE_NOTES=$(cat <<EOF
 **Cập nhật lúc:** $(TZ='Asia/Ho_Chi_Minh' date '+%Y-%m-%d %H:%M (UTC+7)')
 
 - 🔗 **Changelog / Commit Diff:** https://github.com/${REPO}/commit/${SHA}
+${GITHUB_RUN_ID:+- 🚀 **Workflow Run / Full Logs:** https://github.com/${REPO}/actions/runs/${GITHUB_RUN_ID}}
 - 🌐 **Máy chủ tải gói (VPS):** https://arch.tinhiem.id.vn/
 
 #### ✅ Gói mới biên dịch thành công:

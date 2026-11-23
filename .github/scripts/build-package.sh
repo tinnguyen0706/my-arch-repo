@@ -99,11 +99,16 @@ else
       done
     fi
     if [[ -f "${BUILD_LOG:-}" ]]; then
-      mapfile -t error_snippet < <(grep -Ei 'error[:\[]|failed|fatal:|panicked at|cannot find' "$BUILD_LOG" | grep -Ev 'failed retrieving file' | tail -n 10 || true)
+      # Bắt các dòng lỗi thật sự (bỏ qua dòng nhiễu như failed retrieving file), kèm 2 dòng ngữ cảnh trước đó
+      mapfile -t error_snippet < <(grep -Ein -B 2 'error[:\[]|==> ERROR:|failed|fatal:|panicked at|cannot find|CMake Error|No such file' "$BUILD_LOG" | grep -Ev 'failed retrieving file' | tail -n 30 || true)
       if (( ${#error_snippet[@]} == 0 )); then
-        mapfile -t error_snippet < <(tail -n 10 "$BUILD_LOG" || true)
+        mapfile -t error_snippet < <(tail -n 30 "$BUILD_LOG" || true)
       fi
-      printf '%s\n' "${error_snippet[@]}" > "output/reason-failed-${PKG}-${TARGET_ARCH}.txt"
+      {
+        printf '%s\n' "${error_snippet[@]}"
+        echo "--- Tail (25 lines) ---"
+        tail -n 25 "$BUILD_LOG" || true
+      } > "output/reason-failed-${PKG}-${TARGET_ARCH}.txt"
     fi
     if (( ${#FALLBACK_CANDIDATES[@]} > 0 )); then
       echo "Retained existing build on repository for $PKG ($TARGET_ARCH)"
