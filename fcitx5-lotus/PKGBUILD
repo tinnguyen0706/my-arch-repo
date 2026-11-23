@@ -26,7 +26,7 @@ depends=(
   'python-qtpy'
   'python-dbus'
 )
-makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'python' 'wayland')
+makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'make' 'pkgconf' 'dbus' 'python' 'wayland')
 install='fcitx5-lotus.install'
 source=("git+https://github.com/LotusInputMethod/fcitx5-lotus.git#tag=v$pkgver")
 sha256sums=(
@@ -35,7 +35,13 @@ sha256sums=(
 
 build() {
   cd "$srcdir/fcitx5-lotus"
+  # Upstream README (Arch section): cmake with /usr prefix, then make.
   cmake \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=/usr/lib \
+    -DINSTALL_OPENRC=OFF \
+    -DINSTALL_RUNIT=OFF \
+    .
   make
 }
 
