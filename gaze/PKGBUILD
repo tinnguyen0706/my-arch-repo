@@ -2,7 +2,7 @@
 
 pkgname=gaze
 pkgver=0.5.3
-_ort_ver=1.31.1
+_ort_ver=1.32.0
 pkgrel=1
 pkgdesc="Daemon, CLI, and PAM integration for Gaze"
 arch=('x86_64')
@@ -26,19 +26,23 @@ makedepends=(
   'git'
   'llvm'
   'pkgconf'
+  'unzip'
 )
 backup=(
   'etc/dbus-1/system.d/com.gundulabs.Gaze.conf'
   'etc/gaze/config.toml'
 )
 install=gaze.install
+noextract=(
+  "microsoft.ml.onnxruntime.${_ort_ver}.nupkg"
+)
 source=(
   "https://github.com/GunduLabs/gaze/archive/refs/tags/v${pkgver}/${pkgname}-${pkgver}.tar.gz"
-  "onnxruntime-linux-x64-${_ort_ver}.tgz::https://github.com/microsoft/onnxruntime/releases/download/v${_ort_ver}/onnxruntime-linux-x64-${_ort_ver}.tgz"
+  "microsoft.ml.onnxruntime.${_ort_ver}.nupkg::https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/${_ort_ver}/microsoft.ml.onnxruntime.${_ort_ver}.nupkg"
 )
 sha256sums=(
   '6bec57f478f9a034441d8cf563b085d9ab7c8b7145f280db8c599ada5f05a8fa'
-  'c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9'
+  'a9150bc2992cbbb6722070da9910e1ffa989a8bfc67bdd5bb8e745ca755641db'
 )
 
 _srcenv() {
@@ -57,16 +61,28 @@ _srcenv() {
 prepare() {
   _srcenv
   cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+
+  mkdir -p "$srcdir/ort"
+  unzip -qoj "$srcdir/microsoft.ml.onnxruntime.${_ort_ver}.nupkg" \
+    LICENSE ThirdPartyNotices.txt "runtimes/linux-x64/native/libonnxruntime.so" \
+    -d "$srcdir/ort"
 }
 
 build() {
   _srcenv
+  # Two invocations match upstream Justfile to keep gaze-vision's detector/inference
+  # code out of the client and PAM binaries via Cargo feature isolation.
   cargo build --release --locked \
     --target "$CARCH-unknown-linux-gnu" \
-    -p gazed \
+    -p gazed
+  cargo build --release --locked \
+    --target "$CARCH-unknown-linux-gnu" \
     -p gaze-cli \
     -p pam-gaze \
     -p pam-gaze-grosshack
+  scripts/check-pam-link.sh \
+    "target/$CARCH-unknown-linux-gnu/release/libpam_gaze.so" \
+    "target/$CARCH-unknown-linux-gnu/release/libpam_gaze_grosshack.so"
 }
 
 package() {
@@ -87,9 +103,9 @@ package() {
   install -Dm644 "packaging/config/com.gundulabs.gaze.policy" "$pkgdir/usr/share/polkit-1/actions/com.gundulabs.gaze.policy"
 
   # Runtime ONNX dynamic library and notices
-  install -Dm644 "$srcdir/onnxruntime-linux-x64-${_ort_ver}/lib/libonnxruntime.so" "$pkgdir/usr/lib/gaze/libonnxruntime.so"
-  install -Dm644 "$srcdir/onnxruntime-linux-x64-${_ort_ver}/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/onnxruntime/LICENSE"
-  install -Dm644 "$srcdir/onnxruntime-linux-x64-${_ort_ver}/ThirdPartyNotices.txt" "$pkgdir/usr/share/licenses/$pkgname/onnxruntime/ThirdPartyNotices.txt"
+  install -Dm644 "$srcdir/ort/libonnxruntime.so" "$pkgdir/usr/lib/gaze/libonnxruntime.so"
+  install -Dm644 "$srcdir/ort/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/onnxruntime/LICENSE"
+  install -Dm644 "$srcdir/ort/ThirdPartyNotices.txt" "$pkgdir/usr/share/licenses/$pkgname/onnxruntime/ThirdPartyNotices.txt"
 
   # Gaze project license
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
