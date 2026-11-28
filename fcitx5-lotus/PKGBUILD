@@ -1,8 +1,8 @@
-# Upstream AUR: https://aur.archlinux.org/packages/fcitx5-lotus (verbatim v6.1.1, but OpenRC/Runit OFF)
+# Upstream AUR: https://aur.archlinux.org/packages/fcitx5-lotus (aligned with v7.0.2, OpenRC/Runit OFF)
 # Maintainer: Nguyen Ky <nhktmdzhg at google mail>
 
 pkgname=fcitx5-lotus
-pkgver=7.0.1
+pkgver=7.0.2
 pkgrel=1
 pkgdesc="Vietnamese input method for fcitx5"
 arch=('x86_64')
@@ -10,6 +10,7 @@ url="https://github.com/LotusInputMethod/fcitx5-lotus"
 license=('GPL-3.0-or-later')
 depends=(
   'acl'
+  'dbus'
   'fcitx5'
   'fcitx5-configtool'
   'fcitx5-gtk'
@@ -23,10 +24,12 @@ depends=(
   'libstdc++'
   'libgcc'
   'libudev.so'
-  'python-qtpy'
-  'python-dbus'
+  'qt6-base'
+  'qt6-declarative'
+  'qt6-svg'
+  'wayland'
 )
-makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'make' 'pkgconf' 'dbus' 'python' 'wayland')
+makedepends=('cmake' 'extra-cmake-modules' 'gcc' 'git' 'make' 'pkgconf')
 install='fcitx5-lotus.install'
 source=("git+https://github.com/LotusInputMethod/fcitx5-lotus.git#tag=v$pkgver")
 sha256sums=(
@@ -35,18 +38,20 @@ sha256sums=(
 
 build() {
   cd "$srcdir/fcitx5-lotus"
-  # Upstream README (Arch section): cmake with /usr prefix, then make.
+  # Upstream README & CI (Arch): Qt6 QML settings GUI + pure systemd (OpenRC/Runit OFF)
   cmake \
+    -B build \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_INSTALL_LIBDIR=/usr/lib \
     -DINSTALL_OPENRC=OFF \
     -DINSTALL_RUNIT=OFF \
     .
-  make
+  cmake --build build
 }
 
 package() {
   cd "$srcdir/fcitx5-lotus"
-  make install DESTDIR="$pkgdir"
+  DESTDIR="$pkgdir" cmake --install build
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
